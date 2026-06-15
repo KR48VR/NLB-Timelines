@@ -1,0 +1,1671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Singapore Libraries, Archives and Heritage Timeline</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    :root {
+      --ink: #18212f;
+      --ink-2: #445065;
+      --muted: #68758b;
+      --line: #d9e0ea;
+      --paper: #f7f9fc;
+      --panel: #ffffff;
+      --blue: #2d6cdf;
+      --teal: #0f8b8d;
+      --green: #248a54;
+      --amber: #f59e0b;
+      --red: #d11f3f;
+      --violet: #6f55bd;
+      --archive: #546a3a;
+      --shadow: 0 18px 45px rgba(24, 33, 47, .12);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--paper);
+      color: var(--ink);
+    }
+    a { color: var(--blue); }
+    button, input { font: inherit; }
+    .app { width: min(1720px, calc(100vw - 28px)); margin: 0 auto; padding: 22px 0 36px; }
+    header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: end;
+      gap: 18px;
+      margin-bottom: 16px;
+    }
+    h1 { margin: 0; font-size: clamp(2rem, 4.2vw, 4.55rem); line-height: .94; letter-spacing: 0; }
+    .subtitle { margin: 12px 0 0; color: var(--ink-2); max-width: 940px; line-height: 1.52; }
+    .badges { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    .badge {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 999px;
+      padding: 8px 11px;
+      color: var(--ink-2);
+      font-size: .84rem;
+      white-space: nowrap;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(820px, 1.75fr) minmax(360px, .65fr);
+      gap: 16px;
+      align-items: start;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+    .map-card { position: sticky; top: 12px; overflow: hidden; }
+    .map-wrap { position: relative; padding: 12px; }
+    #map { height: 760px; border: 1px solid var(--line); border-radius: 6px; background: #dfe8f2; }
+    .fallback-map {
+      display: none;
+      height: 760px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(180deg, #dfeef4, #eef5f9);
+    }
+    .fallback-map svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .fallback-marker {
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      transform: translate(-50%, -50%);
+      border: 2px solid #fff;
+      box-shadow: 0 4px 12px rgba(24, 33, 47, .28);
+    }
+    .fallback-marker.active { width: 15px; height: 15px; }
+    .fallback-marker.selected { width: 19px; height: 19px; border-width: 3px; }
+    .fallback-label {
+      position: absolute;
+      transform: translate(8px, -50%);
+      max-width: 108px;
+      padding: 3px 5px;
+      border: 1px solid rgba(24, 33, 47, .18);
+      border-radius: 5px;
+      background: rgba(255, 255, 255, .92);
+      color: var(--ink);
+      font-size: .64rem;
+      font-weight: 800;
+      line-height: 1.12;
+      box-shadow: 0 5px 14px rgba(24, 33, 47, .12);
+    }
+    .fallback-label.shifted { border-color: rgba(15, 139, 141, .5); color: #096b6d; }
+    .fallback-label.closed { border-color: rgba(209, 31, 63, .55); color: #a3122c; }
+    .fallback-label.lineage { border-color: rgba(111, 85, 189, .5); color: #57439a; }
+    .fallback-label.archive { border-color: rgba(84, 106, 58, .55); color: #3f542b; }
+    .fallback-label.selected { border-color: rgba(45, 108, 223, .6); }
+    .fallback-line {
+      stroke: var(--teal);
+      stroke-width: .75;
+      stroke-dasharray: 1.4 1.8;
+      stroke-linecap: round;
+      opacity: .82;
+    }
+    .map-label-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 430;
+      overflow: hidden;
+      pointer-events: none;
+    }
+    .map-label-connectors {
+      position: absolute;
+      inset: 0;
+      z-index: 428;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      pointer-events: none;
+    }
+    .label-connector {
+      stroke: rgba(24, 33, 47, .62);
+      stroke-width: 1.35;
+      stroke-linecap: round;
+      fill: none;
+      vector-effect: non-scaling-stroke;
+    }
+    .label-connector.active,
+    .label-connector.selected { stroke: rgba(36, 138, 84, .72); }
+    .label-connector.shifted { stroke: rgba(15, 139, 141, .74); }
+    .label-connector.closed { stroke: rgba(209, 31, 63, .74); }
+    .label-connector.lineage { stroke: rgba(111, 85, 189, .76); }
+    .label-connector.archive { stroke: rgba(84, 106, 58, .76); }
+    .smart-map-label {
+      position: absolute;
+      max-width: 108px;
+      padding: 3px 5px;
+      border: 1px solid rgba(24, 33, 47, .18);
+      border-radius: 5px;
+      background: rgba(255, 255, 255, .94);
+      color: var(--ink);
+      box-shadow: 0 6px 16px rgba(24, 33, 47, .14);
+      font-size: 10.5px;
+      font-weight: 850;
+      line-height: 1.12;
+      white-space: normal;
+    }
+    .smart-map-label.shifted { border-color: rgba(15, 139, 141, .5); color: #096b6d; }
+    .smart-map-label.closed { border-color: rgba(209, 31, 63, .55); color: #a3122c; }
+    .smart-map-label.lineage { border-color: rgba(111, 85, 189, .5); color: #57439a; }
+    .smart-map-label.archive { border-color: rgba(84, 106, 58, .55); color: #3f542b; }
+    .smart-map-label.selected {
+      border-color: rgba(45, 108, 223, .6);
+      box-shadow: 0 0 0 2px rgba(45, 108, 223, .12), 0 8px 18px rgba(24, 33, 47, .16);
+    }
+    .map-hud {
+      position: absolute;
+      z-index: 500;
+      top: 24px;
+      left: 24px;
+      right: 24px;
+      display: grid;
+      grid-template-columns: auto minmax(220px, 1fr) auto;
+      gap: 10px;
+      pointer-events: none;
+    }
+    .hud-box {
+      background: rgba(255, 255, 255, .94);
+      border: 1px solid rgba(217, 224, 234, .92);
+      border-radius: 8px;
+      padding: 10px 12px;
+      box-shadow: 0 12px 30px rgba(24, 33, 47, .14);
+      pointer-events: auto;
+    }
+    .kicker {
+      color: var(--muted);
+      font-size: .72rem;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      font-weight: 850;
+    }
+    .year-value { font-size: 2rem; font-weight: 900; line-height: 1; margin-top: 3px; }
+    .hud-note { color: var(--ink-2); line-height: 1.35; text-align: center; max-width: 540px; justify-self: center; }
+    .stats { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+    .stat .value { margin-top: 4px; font-weight: 850; }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 2px 12px 12px;
+      color: var(--ink-2);
+      font-size: .82rem;
+    }
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 6px 9px;
+      background: #fff;
+    }
+    .dot { width: 10px; height: 10px; border-radius: 999px; background: var(--blue); display: inline-block; }
+    .dot.opening { background: var(--green); }
+    .dot.relocation { background: var(--teal); }
+    .dot.renovation { background: var(--amber); }
+    .dot.closure { background: var(--red); }
+    .dot.national { background: var(--violet); }
+    .dot.archive { background: var(--archive); }
+    .line-sample {
+      width: 24px;
+      height: 0;
+      border-top: 2px dotted var(--teal);
+      display: inline-block;
+    }
+    .controls {
+      border-top: 1px solid var(--line);
+      padding: 14px 16px 16px;
+      background: #fbfcfe;
+    }
+    .control-row {
+      display: grid;
+      grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+      gap: 9px;
+      align-items: center;
+    }
+    .speed-row {
+      margin-top: 10px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .pace {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      padding: 7px 10px;
+      color: var(--ink-2);
+      min-width: 142px;
+    }
+    .pace strong {
+      display: block;
+      color: var(--ink);
+      font-size: .9rem;
+      margin-top: 1px;
+    }
+    .btn {
+      border: 1px solid #b9c5d6;
+      background: #fff;
+      color: var(--ink);
+      border-radius: 6px;
+      padding: 9px 12px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .btn.primary {
+      background: var(--ink);
+      color: #fff;
+      border-color: var(--ink);
+    }
+    .btn:hover { filter: brightness(.98); }
+    input[type="range"] { width: 100%; accent-color: var(--blue); }
+    .readout { min-width: 80px; text-align: right; font-weight: 900; }
+    .filters {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+      align-items: center;
+    }
+    .filter-chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 7px 10px;
+      background: #fff;
+      color: var(--ink-2);
+      cursor: pointer;
+      font-size: .82rem;
+      font-weight: 800;
+    }
+    .filter-chip.active { color: #fff; background: var(--ink); border-color: var(--ink); }
+    .search {
+      margin-left: auto;
+      min-width: min(300px, 100%);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 8px 10px;
+      color: var(--ink);
+    }
+    .tick-row {
+      margin-top: 10px;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--muted);
+      font-size: .78rem;
+      font-weight: 750;
+    }
+    .panel { padding: 18px; }
+    h2 { margin: 0; font-size: 1.7rem; line-height: 1.05; letter-spacing: 0; }
+    h3 { margin: 0; font-size: 1rem; }
+    .panel-note { margin: 9px 0 0; color: var(--ink-2); line-height: 1.5; }
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 9px;
+      margin: 15px 0 16px;
+    }
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 11px;
+      background: #fbfcfe;
+      min-height: 86px;
+    }
+    .metric .number { margin-top: 7px; font-size: 1.25rem; font-weight: 900; }
+    .metric .note { margin-top: 4px; color: var(--muted); font-size: .76rem; line-height: 1.35; }
+    .section-title {
+      margin: 16px 0 9px;
+      color: var(--ink);
+      font-size: .78rem;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      font-weight: 900;
+    }
+    .event-list, .library-list {
+      display: grid;
+      gap: 9px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      max-height: 430px;
+      overflow: auto;
+      scrollbar-color: #bcc7d5 transparent;
+    }
+    .event-card, .library-card {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 8px;
+      padding: 11px 12px;
+      line-height: 1.42;
+    }
+    .event-card { border-left: 5px solid var(--blue); }
+    .event-card.opening { border-left-color: var(--green); }
+    .event-card.relocation { border-left-color: var(--teal); }
+    .event-card.renovation { border-left-color: var(--amber); }
+    .event-card.closure { border-left-color: var(--red); }
+    .event-card.national { border-left-color: var(--violet); }
+    .event-card.archive { border-left-color: var(--archive); }
+    .library-card.active { border-left: 5px solid var(--green); }
+    .library-card.shifted { border-left: 5px solid var(--teal); }
+    .library-card.closed { border-left: 5px solid var(--red); }
+    .library-card.lineage { border-left: 5px solid var(--violet); }
+    .library-card.archive { border-left: 5px solid var(--archive); }
+    .event-top { display: flex; gap: 10px; align-items: baseline; justify-content: space-between; }
+    .event-date { font-weight: 900; white-space: nowrap; }
+    .event-kind {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 3px 7px;
+      color: var(--ink-2);
+      font-size: .72rem;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      font-weight: 850;
+      white-space: nowrap;
+    }
+    .event-title { display: block; margin-top: 4px; font-weight: 850; color: var(--ink); }
+    .event-text { margin-top: 4px; color: var(--ink-2); font-size: .9rem; }
+    .event-meta { margin-top: 7px; color: var(--muted); font-size: .78rem; display: flex; flex-wrap: wrap; gap: 8px; }
+    .library-card {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+    }
+    .library-card .name { font-weight: 850; }
+    .library-card .addr { color: var(--muted); font-size: .8rem; margin-top: 2px; }
+    .status {
+      border-radius: 999px;
+      padding: 5px 8px;
+      font-size: .72rem;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      font-weight: 850;
+      border: 1px solid var(--line);
+      color: var(--ink-2);
+      white-space: nowrap;
+    }
+    .status.active { color: #fff; background: var(--green); border-color: var(--green); }
+    .status.inactive { color: #fff; background: var(--red); border-color: var(--red); }
+    .status.shifted { color: #fff; background: var(--teal); border-color: var(--teal); }
+    .status.lineage { color: #fff; background: var(--violet); border-color: var(--violet); }
+    .status.archive { color: #fff; background: var(--archive); border-color: var(--archive); }
+    .chart-card, .source-card { margin-top: 16px; padding: 18px; }
+    .timeline-bars {
+      margin-top: 16px;
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 9px;
+      align-items: end;
+      min-height: 180px;
+    }
+    .bar {
+      display: grid;
+      gap: 7px;
+      align-items: end;
+      min-width: 0;
+    }
+    .bar-fill {
+      height: var(--h);
+      min-height: 8px;
+      border-radius: 6px 6px 0 0;
+      background: linear-gradient(180deg, #2d6cdf, #0f8b8d);
+    }
+    .bar-label { color: var(--muted); font-size: .78rem; text-align: center; font-weight: 750; }
+    .bar-value { color: var(--ink); font-size: .8rem; text-align: center; font-weight: 900; }
+    .sources {
+      columns: 2;
+      column-gap: 28px;
+      margin: 12px 0 0;
+      padding-left: 20px;
+      color: var(--ink-2);
+      line-height: 1.55;
+    }
+    .caveat {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfe;
+      padding: 12px;
+      color: var(--ink-2);
+      line-height: 1.5;
+      margin-top: 12px;
+    }
+    .leaflet-popup-content { color: #1d2532; line-height: 1.35; }
+    .leaflet-control-attribution { font-size: 10px !important; }
+    .leaflet-bottom.leaflet-left .leaflet-control-zoom {
+      margin-left: 12px;
+      margin-bottom: 12px;
+    }
+    @media (max-width: 1120px) {
+      header { grid-template-columns: 1fr; }
+      .badges { justify-content: flex-start; }
+      .layout { grid-template-columns: 1fr; }
+      .map-card { position: static; }
+      #map, .fallback-map { height: 610px; }
+    }
+    @media (max-width: 720px) {
+      .app { width: min(100vw - 18px, 1480px); padding-top: 14px; }
+      .map-hud { grid-template-columns: 1fr; top: 20px; left: 20px; right: 20px; }
+      .hud-note { justify-self: stretch; text-align: left; }
+      .stats { justify-content: flex-start; }
+      .control-row { grid-template-columns: repeat(4, auto); }
+      .control-row input { grid-column: 1 / -1; }
+      .readout { text-align: left; }
+      .metric-grid { grid-template-columns: 1fr; }
+      .timeline-bars { grid-template-columns: repeat(2, 1fr); }
+      .sources { columns: 1; }
+      .search { margin-left: 0; width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div>
+        <h1>Singapore libraries, archives <br />and heritage through time</h1>
+        <p class="subtitle">A source-backed timeline of Singapore's public library network and selected NLB archives/heritage sites, showing openings, relocations, reopenings, closures, major renovations, and institutional heritage markers. Dates keep their original precision, so year-only items are not turned into false exact dates.</p>
+      </div>
+      <div class="badges">
+        <span class="badge">Current locations: NLB API</span>
+        <span class="badge">Events: 1823 to 2026</span>
+        <span class="badge">Public libraries plus archives/heritage</span>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="card map-card">
+        <div class="map-wrap">
+          <div id="map" aria-label="Map of Singapore public library events"></div>
+          <div class="fallback-map" id="fallbackMap" aria-label="Fallback map of Singapore public library events">
+            <svg viewBox="0 0 100 100" aria-hidden="true">
+              <path d="M10,54 C18,42 32,38 45,40 C58,42 69,38 83,43 C90,46 94,55 88,63 C79,75 57,76 42,72 C28,68 16,68 9,61 C6,58 7,56 10,54 Z" fill="#cfe1e7" stroke="#8fb2bf" stroke-width="1.2"></path>
+              <path d="M68,70 C73,68 78,69 82,72 C78,76 71,77 66,74 Z" fill="#d8e7ec" stroke="#8fb2bf" stroke-width=".9"></path>
+              <path d="M22,37 C25,34 31,33 35,35" fill="none" stroke="#b2c7d2" stroke-width=".9"></path>
+              <path d="M82,40 C86,38 91,39 94,42" fill="none" stroke="#b2c7d2" stroke-width=".9"></path>
+            </svg>
+          </div>
+          <div class="map-hud">
+            <div class="hud-box">
+              <div class="kicker">Selected year</div>
+              <div class="year-value" id="yearLabel">2026</div>
+            </div>
+            <div class="hud-box hud-note" id="hudNote">Markers show active public library locations by the selected year, with same-year changes highlighted.</div>
+            <div class="stats">
+              <div class="hud-box stat"><div class="kicker">Active in data</div><div class="value" id="activeCount">0</div></div>
+              <div class="hud-box stat"><div class="kicker">Events shown</div><div class="value" id="eventCount">0</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="legend">
+          <span><i class="dot opening"></i> opening / active</span>
+          <span><i class="dot relocation"></i> relocated / shifted</span>
+          <span><i class="dot renovation"></i> rebuilt / renovated</span>
+          <span><i class="dot closure"></i> closed / demolished</span>
+          <span><i class="dot national"></i> national-library lineage</span>
+          <span><i class="dot archive"></i> archives / heritage</span>
+          <span><i class="line-sample"></i> dotted lineage / shift path</span>
+        </div>
+        <div class="controls">
+          <div class="control-row">
+            <button class="btn primary" id="playButton" type="button">Play</button>
+            <button class="btn" id="backButton" type="button">Back</button>
+            <input id="timelineSlider" type="range" min="0" max="0" value="0" step="1" aria-label="Timeline year" />
+            <button class="btn" id="nextButton" type="button">Next</button>
+            <div class="readout" id="readout">2026</div>
+          </div>
+          <div class="speed-row">
+            <button class="btn" id="slowerButton" type="button">Slower</button>
+            <div class="pace"><span class="kicker">Animation pace</span><strong id="paceLabel">8s / step</strong></div>
+            <button class="btn" id="fasterButton" type="button">Faster</button>
+          </div>
+          <div class="filters" id="filters"></div>
+          <div class="tick-row"><span>1823</span><span>1960</span><span>1980s</span><span>2000s</span><span>2026</span></div>
+        </div>
+      </section>
+
+      <aside class="card panel">
+        <div class="kicker">Year focus</div>
+        <h2 id="panelTitle">Network view</h2>
+        <p class="panel-note" id="panelNote">Loading timeline data...</p>
+        <div class="metric-grid">
+          <div class="metric"><div class="kicker">Open public libraries</div><div class="number" id="metricActive">0</div><div class="note">Based on public-library state-changing events.</div></div>
+          <div class="metric"><div class="kicker">Mapped sites</div><div class="number" id="metricSites">0</div><div class="note">Active plus historical locations kept on the map.</div></div>
+          <div class="metric"><div class="kicker">Same-year changes</div><div class="number" id="metricYearEvents">0</div><div class="note">Events whose year matches the slider.</div></div>
+          <div class="metric"><div class="kicker">Data precision</div><div class="number" id="metricPrecision">Mixed</div><div class="note">Exact dates are shown when the source gives them.</div></div>
+        </div>
+        <div class="section-title">Changes in selected year</div>
+        <ul class="event-list" id="yearEvents"></ul>
+        <div class="section-title">Site register and lineage</div>
+        <ul class="library-list" id="libraryList"></ul>
+      </aside>
+    </main>
+
+    <section class="card chart-card">
+      <div class="kicker">Build-up trace</div>
+      <h2>Open public-library locations over time</h2>
+      <p class="panel-note">The bars use the same state-changing events as the map. Closed-for-renovation branches are removed until their reopening event appears.</p>
+      <div class="timeline-bars" id="bars"></div>
+    </section>
+
+    <section class="card source-card">
+      <div class="kicker">Sources and caveats</div>
+      <h2>How the data was assembled</h2>
+      <div class="caveat">Current public-library names, addresses, coordinates, and most branch histories come from the National Library Board library listing API and branch pages. Historical national-library lineage comes from NLB's official History of National Library page. National Archives of Singapore and Former Ford Factory are included as a separate archives/heritage layer because NLB lists NAS under its current institutions and locations. OneMap address search was used to place former sites where current NLB coordinates no longer apply. A few exact dates for former/specialised libraries that were not present in the current NLB API are marked as secondary cross-checks. The old Stamford Road marker is approximate to the former 91 Stamford Road site.</div>
+      <ol class="sources" id="sourceList"></ol>
+    </section>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const sources = {
+      nlbApi: {
+        label: "National Library Board: public libraries listing and branch histories",
+        url: "https://www.nlb.gov.sg/main/visit-us/our-libraries-and-locations?library-types=PL"
+      },
+      nlbHistory: {
+        label: "National Library Board: History of National Library",
+        url: "https://www.nlb.gov.sg/main/visit-us/our-libraries-and-locations/libraries/national-library-singapore/about/history-of-national-library"
+      },
+      nlbNational: {
+        label: "National Library Board: National Library Singapore branch page",
+        url: "https://www.nlb.gov.sg/main/visit-us/our-libraries-and-locations/libraries/national-library-singapore"
+      },
+      oneMap: {
+        label: "OneMap Singapore: address search coordinates",
+        url: "https://www.onemap.gov.sg/"
+      },
+      orchardSecondary: {
+        label: "Secondary cross-check: Orchard Library history",
+        url: "https://en.wikipedia.org/wiki/Orchard_Library"
+      },
+      esplanadeSecondary: {
+        label: "Secondary cross-check: library@esplanade history",
+        url: "https://en.wikipedia.org/wiki/Library%40esplanade"
+      },
+      punggolSecondary: {
+        label: "Secondary cross-check: Punggol Library opening stages",
+        url: "https://en.wikipedia.org/wiki/Punggol_Library"
+      },
+      centralArtsSecondary: {
+        label: "Secondary cross-check: Central Arts Library opening",
+        url: "https://en.wikipedia.org/wiki/Central_Arts_Library"
+      },
+      yishunSecondary: {
+        label: "Secondary cross-check: Yishun Library original site and relocation",
+        url: "https://en.wikipedia.org/wiki/Yishun_Public_Library"
+      },
+      bedokSecondary: {
+        label: "Secondary cross-check: Bedok Library original site",
+        url: "https://en.wikipedia.org/wiki/Bedok_Public_Library"
+      },
+      tampinesSecondary: {
+        label: "Secondary cross-check: Tampines Regional Library original site",
+        url: "https://en.wikipedia.org/wiki/Tampines_Regional_Library"
+      },
+      nlbNas: {
+        label: "National Library Board: National Archives of Singapore",
+        url: "https://www.nlb.gov.sg/main/visit-us/our-libraries-and-locations/libraries/national-archives-of-singapore"
+      },
+      nasFord: {
+        label: "National Archives of Singapore: Former Ford Factory",
+        url: "https://corporate.nas.gov.sg/former-ford-factory/overview/"
+      },
+      nasSecondary: {
+        label: "Secondary cross-check: National Archives of Singapore history",
+        url: "https://en.wikipedia.org/wiki/National_Archives_of_Singapore"
+      }
+    };
+
+    const events = [
+      { id: "nl-1823", libraryId: "national-lineage", libraryName: "National Library lineage", date: "1823", precision: "year", type: "national", stateImpact: "context", lat: 1.2933, lng: 103.8520, title: "Library roots in the Singapore Institution", summary: "Sir Stamford Raffles established the Singapore Institution and proposed that a library support its educational aims.", address: "Singapore Institution site, Bras Basah area", source: "nlbHistory" },
+      { id: "nl-1845", libraryId: "national-lineage", libraryName: "Singapore Library", date: "1845-01-22", precision: "exact", type: "national", stateImpact: "context", lat: 1.2933, lng: 103.8520, title: "Singapore Library officially opened", summary: "The Singapore Library was formed and opened as Singapore's first subscription library.", address: "Singapore Institution site, Bras Basah area", source: "nlbHistory" },
+      { id: "nl-1874", libraryId: "national-lineage", libraryName: "Raffles Library and Museum", date: "1874-07-16", precision: "exact", type: "national", stateImpact: "context", lat: 1.2966, lng: 103.8485, title: "Renamed Raffles Library and Museum", summary: "The Singapore Library became known as the Raffles Library and Museum.", address: "Stamford Road museum precinct", source: "nlbHistory" },
+      { id: "nl-1887", libraryId: "national-lineage", libraryName: "Raffles Library and Museum", date: "1887-10-12", precision: "exact", type: "national", stateImpact: "context", lat: 1.2966, lng: 103.8485, title: "New Raffles Library and Museum building opened", summary: "Governor Sir Frederick Weld officially opened the new Raffles Library and Museum building.", address: "Stamford Road museum precinct", source: "nlbHistory" },
+      { id: "nl-1942", libraryId: "national-lineage", libraryName: "Raffles Library and Museum", date: "1942-04-29", precision: "exact", type: "closure", stateImpact: "context", lat: 1.2966, lng: 103.8485, title: "Wartime reopening under occupation", summary: "After closing during the fall of Singapore, the library officially reopened during the Japanese Occupation.", address: "Stamford Road museum precinct", source: "nlbHistory" },
+      { id: "nl-1945", libraryId: "national-lineage", libraryName: "Raffles Library", date: "1945-12-01", precision: "exact", type: "national", stateImpact: "context", lat: 1.2966, lng: 103.8485, title: "Reopened under British Administration", summary: "The library reopened to the public after the Japanese Occupation.", address: "Stamford Road museum precinct", source: "nlbHistory" },
+      { id: "nl-1957", libraryId: "national-lineage", libraryName: "National Library at Stamford Road", date: "1957-08-15", precision: "exact", type: "national", stateImpact: "context", lat: 1.2965, lng: 103.8498, title: "Foundation stone laid at Stamford Road", summary: "Lee Kong Chian laid the foundation stone for the National Library at Stamford Road.", address: "Former 91 Stamford Road site (approx.)", source: "nlbHistory" },
+      { id: "nl-1958", libraryId: "national-lineage", libraryName: "National Library", date: "1958-04-01", precision: "exact", type: "national", stateImpact: "context", lat: 1.2965, lng: 103.8498, title: "Free public service enabled", summary: "The Raffles National Library Ordinance came into effect, enabling free public library service for Singapore residents.", address: "Stamford Road", source: "nlbHistory" },
+      { id: "nl-1960-open", libraryId: "national-lineage", libraryName: "National Library at Stamford Road", date: "1960-11-12", precision: "exact", type: "national", stateImpact: "context", lat: 1.2965, lng: 103.8498, title: "National Library opened at Stamford Road", summary: "The Raffles Library was renamed the National Library and officially opened by Yang di-Pertuan Negara Yusof Ishak.", address: "Former 91 Stamford Road site (approx.)", source: "nlbHistory" },
+      { id: "mobile-1960", libraryId: "mobile-library", libraryName: "Mobile library services", date: "1960", precision: "year", type: "opening", stateImpact: "context", lat: 1.3521, lng: 103.8198, title: "Mobile library services introduced", summary: "Library vans began serving places including West Coast, Tanjong Pagar, Nee Soon, Bukit Panjang, Sembawang, Tampines, Pasir Panjang, Bukit Timah, Changi and Kaki Bukit.", address: "Islandwide service", source: "nlbHistory" },
+      { id: "nas-1968", libraryId: "national-archives", libraryName: "National Archives of Singapore", date: "1968", precision: "year", type: "archive", category: "archive", stateImpact: "active", lat: 1.2929673, lng: 103.8482995, title: "National Archives officially set up", summary: "NAS was officially set up in 1968 to preserve and administer Singapore's archival records. The marker is shown at the current NAS address for institutional context.", address: "Current NAS reference point: 1 Canning Rise, Singapore 179868", source: "nlbNas" },
+
+      { id: "queenstown-open", libraryId: "queenstown", libraryName: "Queenstown Library", date: "1970-04-30", precision: "exact", type: "opening", stateImpact: "active", lat: 1.298706, lng: 103.805520, title: "Queenstown Library opened", summary: "Singapore's oldest surviving public library was officially opened by Prime Minister Lee Kuan Yew.", address: "53 Margaret Drive, Singapore 149297", source: "nlbApi" },
+      { id: "toa-open", libraryId: "toa-payoh", libraryName: "Toa Payoh Library", date: "1974-02-07", precision: "exact", type: "opening", stateImpact: "active", lat: 1.333618, lng: 103.850969, title: "Toa Payoh Library inaugurated", summary: "The second public library in the 1970s network expansion was inaugurated by Minister for Culture Jek Yeun Thong.", address: "6 Toa Payoh Central, Singapore 319191", source: "nlbApi" },
+      { id: "marine-open", libraryId: "marine-parade", libraryName: "Marine Parade Library", date: "1978-11-10", precision: "exact", type: "opening", stateImpact: "active", lat: 1.304664, lng: 103.909581, title: "Marine Parade Community Library opened", summary: "The third full-time branch library was opened by Goh Chok Tong.", address: "Marine Parade area", source: "nlbApi" },
+      { id: "amk-open", libraryId: "ang-mo-kio", libraryName: "Ang Mo Kio Library", date: "1985-08-17", precision: "exact", type: "opening", stateImpact: "active", lat: 1.374784, lng: 103.845581, title: "Ang Mo Kio Library opened", summary: "The stand-alone Ang Mo Kio Library was officially opened in the town centre.", address: "4300 Ang Mo Kio Avenue 6, Singapore 569842", source: "nlbApi" },
+      { id: "bedok-open", libraryId: "bedok", libraryName: "Bedok Library", date: "1985-09-28", precision: "exact", type: "opening", stateImpact: "active", lat: 1.3268467, lng: 103.9308063, title: "Bedok Library opened at its original site", summary: "Bedok Library was officially opened at 21 Bedok North Street 1.", address: "21 Bedok North Street 1, Singapore 469659", source: "bedokSecondary" },
+      { id: "queenstown-online", libraryId: "queenstown", libraryName: "Queenstown Library", date: "1987-10-07", precision: "exact", type: "renovation", stateImpact: "none", lat: 1.298706, lng: 103.805520, title: "Queenstown services went online", summary: "Queenstown became the first public library in the network to have its library services go online.", address: "53 Margaret Drive, Singapore 149297", source: "nlbApi" },
+      { id: "geylang-open", libraryId: "geylang-east", libraryName: "Geylang East Library", date: "1988-07-26", precision: "exact", type: "opening", stateImpact: "active", lat: 1.317437, lng: 103.885837, title: "Geylang East Library opened", summary: "The fully computerised library opened with a collection of about 100,000 publications.", address: "50 Geylang East Ave 1, Singapore 389777", source: "nlbApi" },
+      { id: "jurong-open", libraryId: "jurong", libraryName: "Jurong Library", date: "1988-08-01", precision: "exact", type: "opening", stateImpact: "active", lat: 1.332888, lng: 103.739243, title: "Jurong East Community Library opened", summary: "Opened as Jurong East Community Library before later reopening as Jurong Library.", address: "21 Jurong East Central 1, Singapore 609732", source: "nlbApi" },
+      { id: "mobile-1991", libraryId: "mobile-library", libraryName: "Mobile library services", date: "1991", precision: "year", type: "closure", stateImpact: "context", lat: 1.3521, lng: 103.8198, title: "Original mobile service terminated", summary: "The first mobile library service was phased out from the 1980s and terminated in 1991 as branch libraries expanded.", address: "Islandwide service", source: "nlbHistory" },
+      { id: "tampines-open", libraryId: "tampines", libraryName: "Tampines Library", date: "1994-12-03", precision: "exact", type: "opening", stateImpact: "active", lat: 1.3563099, lng: 103.9445283, title: "Tampines Regional Library opened", summary: "Singapore's first regional public library opened along Tampines Avenue 7 as a prototype for new services.", address: "31 Tampines Avenue 7, Singapore 529620", source: "tampinesSecondary" },
+      { id: "jurong-west-open", libraryId: "jurong-west", libraryName: "Jurong West Library", date: "1996-03-28", precision: "exact", type: "opening", stateImpact: "active", lat: 1.3394527, lng: 103.7066850, title: "Jurong West Library opened at Jurong Point", summary: "Jurong West Library first opened at Jurong Point.", address: "1 Jurong West Central 2, Jurong Point, Singapore 648886", source: "nlbApi" },
+      { id: "nas-canning-rise", libraryId: "national-archives", libraryName: "National Archives of Singapore", date: "1997", precision: "year", type: "archive", category: "archive", stateImpact: "active", lat: 1.2929673, lng: 103.8482995, title: "NAS moved to Canning Rise", summary: "NAS has been at 1 Canning Rise since 1997; the current building occupies the former Anglo-Chinese School site.", address: "1 Canning Rise, Singapore 179868", source: "nasSecondary" },
+      { id: "cheng-san-open", libraryId: "cheng-san", libraryName: "Cheng San Library", date: "1997-03-06", precision: "exact", type: "opening", stateImpact: "active", lat: 1.372566, lng: 103.893775, title: "Cheng San Library opened", summary: "The library opened inside Hougang Mall.", address: "90 Hougang Avenue 10, Hougang Mall #03-11, Singapore 538766", source: "nlbApi" },
+      { id: "cck-open", libraryId: "choa-chu-kang", libraryName: "Choa Chu Kang Library", date: "1997-02-22", precision: "exact", type: "opening", stateImpact: "active", lat: 1.384953, lng: 103.745039, title: "Choa Chu Kang Library opened at Lot One", summary: "The library opened at Lot One Shoppers' Mall Level 3.", address: "21 Choa Chu Kang Ave 4, Lot One, Singapore 689812", source: "nlbApi" },
+      { id: "bp-open", libraryId: "bukit-panjang", libraryName: "Bukit Panjang Library", date: "1998-04-04", precision: "exact", type: "opening", stateImpact: "active", lat: 1.379930, lng: 103.764350, title: "Bukit Panjang Library opened", summary: "The library opened in Bukit Panjang Plaza.", address: "1 Jelebu Road, Bukit Panjang Plaza, Singapore 677743", source: "nlbApi" },
+      { id: "yishun-open", libraryId: "yishun", libraryName: "Yishun Library", date: "1998-02-26", precision: "exact", type: "opening", stateImpact: "active", lat: 1.4360627, lng: 103.8361631, title: "Yishun Library opened at Yishun Street 22", summary: "Yishun Library first opened in the former Sembawang Town Council building.", address: "Block 290 Yishun Street 22, Singapore 760290", source: "yishunSecondary" },
+      { id: "bb-open", libraryId: "bukit-batok", libraryName: "Bukit Batok Library", date: "1998-11-21", precision: "exact", type: "opening", stateImpact: "active", lat: 1.349491, lng: 103.749285, title: "Bukit Batok Library opened", summary: "The West Mall library opened and became the first in the network to introduce ELiMS.", address: "1 Bukit Batok Central Link, West Mall, Singapore 658713", source: "nlbApi" },
+      { id: "orchard-open-old", libraryId: "orchard", libraryName: "Orchard Library", date: "1999-10-21", precision: "exact", type: "opening", stateImpact: "active", lat: 1.3022417, lng: 103.8351819, title: "library@orchard opened at Ngee Ann City", summary: "The first library@orchard opened as a mall-based library aimed at young adults.", address: "391 Orchard Road, Ngee Ann City, Singapore 238872", source: "orchardSecondary" },
+      { id: "toa-reopen", libraryId: "toa-payoh", libraryName: "Toa Payoh Library", date: "1999-05-10", precision: "exact", type: "renovation", stateImpact: "active", lat: 1.333618, lng: 103.850969, title: "Toa Payoh Library reopened after major renovation", summary: "The library reopened after a major renovation.", address: "6 Toa Payoh Central, Singapore 319191", source: "nlbApi" },
+      { id: "marine-relocate", libraryId: "marine-parade", libraryName: "Marine Parade Library", date: "2000", precision: "year", type: "relocation", stateImpact: "active", lat: 1.304664, lng: 103.909581, title: "Marine Parade Library shifted into the community complex", summary: "The library shifted to be co-located with the Marine Parade Community Complex.", address: "278 Marine Parade Road, Marine Parade Community Building, Singapore 449282", source: "nlbApi" },
+      { id: "pasir-ris-open", libraryId: "pasir-ris", libraryName: "Pasir Ris Library", date: "2000-10-06", precision: "exact", type: "opening", stateImpact: "active", lat: 1.372351, lng: 103.949440, title: "Pasir Ris Library opened", summary: "The White Sands library opened to serve young families in Pasir Ris.", address: "1 Pasir Ris Central St 3, White Sands, Singapore 518457", source: "nlbApi" },
+      { id: "sembawang-open", libraryId: "sembawang", libraryName: "Sembawang Library", date: "2000-08-11", precision: "exact", type: "opening", stateImpact: "active", lat: 1.448190, lng: 103.819499, title: "Sembawang Library opened", summary: "Sembawang Library opened at Sun Plaza.", address: "30 Sembawang Drive, Sun Plaza, Singapore 757713", source: "nlbApi" },
+      { id: "woodlands-open", libraryId: "woodlands", libraryName: "Woodlands Library", date: "2001-04-28", precision: "exact", type: "opening", stateImpact: "active", lat: 1.435030, lng: 103.786928, title: "Woodlands Library opened", summary: "Singapore's first full-fledged regional library opened at Woodlands Civic Centre.", address: "900 South Woodlands Drive #01-03, Singapore 730900", source: "nlbApi" },
+      { id: "esplanade-open", libraryId: "esplanade", libraryName: "library@esplanade", date: "2002-09-12", precision: "exact", type: "opening", stateImpact: "active", lat: 1.2896478, lng: 103.8562673, title: "library@esplanade opened", summary: "Singapore's performing-arts public library opened inside Esplanade Mall.", address: "8 Raffles Avenue, Esplanade Mall, Singapore 039802", source: "esplanadeSecondary" },
+      { id: "sengkang-open", libraryId: "sengkang", libraryName: "Sengkang Library", date: "2002-11-30", precision: "exact", type: "opening", stateImpact: "active", lat: 1.391322, lng: 103.894688, title: "Sengkang Library opened", summary: "The library opened at Compass Point to serve Sengkang and Punggol.", address: "1 Sengkang Square, Compass One, Singapore 545078", source: "nlbApi" },
+      { id: "amk-close-2002", libraryId: "ang-mo-kio", libraryName: "Ang Mo Kio Library", date: "2002-03", precision: "month", type: "closure", stateImpact: "inactive", lat: 1.374784, lng: 103.845581, title: "Ang Mo Kio Library closed for upgrading", summary: "The library closed in March 2002 for upgrading.", address: "4300 Ang Mo Kio Avenue 6, Singapore 569842", source: "nlbApi" },
+      { id: "queenstown-close", libraryId: "queenstown", libraryName: "Queenstown Library", date: "2003-02-04", precision: "exact", type: "closure", stateImpact: "inactive", lat: 1.298706, lng: 103.805520, title: "Queenstown Library closed for upgrading", summary: "The library closed for upgrading work.", address: "53 Margaret Drive, Singapore 149297", source: "nlbApi" },
+      { id: "amk-reopen", libraryId: "ang-mo-kio", libraryName: "Ang Mo Kio Library", date: "2003-01-26", precision: "exact", type: "renovation", stateImpact: "active", lat: 1.374784, lng: 103.845581, title: "Ang Mo Kio Library reopened after upgrading", summary: "The upgraded library reopened.", address: "4300 Ang Mo Kio Avenue 6, Singapore 569842", source: "nlbApi" },
+      { id: "queenstown-reopen", libraryId: "queenstown", libraryName: "Queenstown Library", date: "2003-10-31", precision: "exact", type: "renovation", stateImpact: "active", lat: 1.298706, lng: 103.805520, title: "Queenstown Library reopened", summary: "The library reopened after upgrading.", address: "53 Margaret Drive, Singapore 149297", source: "nlbApi" },
+      { id: "stamford-close", libraryId: "national-lineage", libraryName: "National Library at Stamford Road", date: "2004-03-31", precision: "exact", type: "closure", stateImpact: "context", lat: 1.2965, lng: 103.8498, title: "Stamford Road National Library closed", summary: "The red-brick National Library building closed before demolition for urban redevelopment.", address: "Former 91 Stamford Road site (approx.)", source: "nlbHistory" },
+      { id: "jurong-reopen", libraryId: "jurong", libraryName: "Jurong Library", date: "2004-06-04", precision: "exact", type: "renovation", stateImpact: "active", lat: 1.332888, lng: 103.739243, title: "Jurong Library reopened after refurbishment", summary: "Jurong East Community Library reopened as Jurong Library.", address: "21 Jurong East Central 1, Singapore 609732", source: "nlbApi" },
+      { id: "central-open", libraryId: "central", libraryName: "Central Library", date: "2005", precision: "year", type: "relocation", stateImpact: "active", lat: 1.297414, lng: 103.854235, title: "Central Library opened at Victoria Street", summary: "Formerly the Central Lending Library at Stamford Road, it relocated to Victoria Street and opened as Central Library.", address: "100 Victoria Street, Singapore 188064", source: "nlbApi" },
+      { id: "ford-acquired", libraryId: "former-ford-factory", libraryName: "Former Ford Factory", date: "2005", precision: "year", type: "archive", category: "archive", stateImpact: "active", lat: 1.3528265, lng: 103.7688398, title: "NAS acquired the Former Ford Factory site", summary: "NAS acquired the historically significant Former Ford Factory site, where the British surrendered to the Japanese during World War II.", address: "351 Upper Bukit Timah Road, Singapore 588192", source: "nlbNas" },
+      { id: "national-current-open", libraryId: "national-lineage", libraryName: "National Library at Victoria Street", date: "2005-11-12", precision: "exact", type: "national", stateImpact: "context", lat: 1.297196, lng: 103.854287, title: "National Library building officially opened", summary: "The current National Library building at Victoria Street was officially opened.", address: "100 Victoria Street, Singapore 188064", source: "nlbNational" },
+      { id: "ford-gazetted", libraryId: "former-ford-factory", libraryName: "Former Ford Factory", date: "2006-02-15", precision: "exact", type: "archive", category: "archive", stateImpact: "active", lat: 1.3528265, lng: 103.7688398, title: "Former Ford Factory gazetted as a national monument", summary: "The remaining portions of the Former Ford Factory were gazetted as a national monument on 15 February 2006.", address: "351 Upper Bukit Timah Road, Singapore 588192", source: "nasFord" },
+      { id: "jurong-west-relocate", libraryId: "jurong-west", libraryName: "Jurong West Library", date: "2006-03-10", precision: "exact", type: "relocation", stateImpact: "active", lat: 1.340630, lng: 103.704512, title: "Jurong West Library reopened at Frontier Community Place", summary: "The library moved from Jurong Point to Frontier Community Place and reopened three times larger.", address: "60 Jurong West Central 3 #01-03, Singapore 648346", source: "nlbApi", movedFrom: { lat: 1.3394527, lng: 103.7066850 } },
+      { id: "bishan-open", libraryId: "bishan", libraryName: "Bishan Library", date: "2006-09-01", precision: "exact", type: "opening", stateImpact: "active", lat: 1.349844, lng: 103.848840, title: "Bishan Library opened", summary: "The five-storey library opened at Bishan Place.", address: "5 Bishan Place #01-01, Singapore 579841", source: "nlbApi" },
+      { id: "orchard-close-old", libraryId: "orchard", libraryName: "Orchard Library", date: "2007-11-30", precision: "exact", type: "closure", stateImpact: "inactive", lat: 1.3022417, lng: 103.8351819, title: "library@orchard at Ngee Ann City closed", summary: "The first library@orchard closed after its lease at Ngee Ann City was not renewed.", address: "391 Orchard Road, Ngee Ann City, Singapore 238872", source: "orchardSecondary" },
+      { id: "molly-2008", libraryId: "mobile-library", libraryName: "MOLLY mobile library", date: "2008", precision: "year", type: "opening", stateImpact: "context", lat: 1.3521, lng: 103.8198, title: "Mobile library service revived as MOLLY", summary: "NLB revived mobile library service with MOLLY, using a refitted bus.", address: "Islandwide service", source: "nlbHistory" },
+      { id: "cck-relocate", libraryId: "choa-chu-kang", libraryName: "Choa Chu Kang Library", date: "2008", precision: "year", type: "relocation", stateImpact: "active", lat: 1.384953, lng: 103.745039, title: "Choa Chu Kang Library relocated within Lot One", summary: "The library moved from Level 3 to Level 4 of Lot One Shoppers' Mall.", address: "21 Choa Chu Kang Ave 4, Lot One, Singapore 689812", source: "nlbApi" },
+      { id: "yishun-close", libraryId: "yishun", libraryName: "Yishun Library", date: "2008-10-13", precision: "exact", type: "closure", stateImpact: "inactive", lat: 1.4360627, lng: 103.8361631, title: "Yishun Library closed at Yishun Street 22", summary: "The original Yishun Street 22 site closed ahead of relocation.", address: "Block 290 Yishun Street 22, Singapore 760290", source: "yishunSecondary" },
+      { id: "yishun-relocate", libraryId: "yishun", libraryName: "Yishun Library", date: "2008-11-14", precision: "exact", type: "relocation", stateImpact: "active", lat: 1.429709, lng: 103.835803, title: "Yishun Library reopened at Northpoint", summary: "The library reopened at Level 4 of Northpoint's extension, closer to Yishun MRT.", address: "930 Yishun Ave 2, Northpoint City, Singapore 769098", source: "yishunSecondary", movedFrom: { lat: 1.4360627, lng: 103.8361631 } },
+      { id: "clementi-open", libraryId: "clementi", libraryName: "Clementi Library", date: "2011-04-23", precision: "exact", type: "opening", stateImpact: "active", lat: 1.315056, lng: 103.764306, title: "Clementi Library opened", summary: "The library opened on Level 5 of The Clementi Mall.", address: "3155 Commonwealth Avenue West, The Clementi Mall, Singapore 129588", source: "nlbApi" },
+      { id: "serangoon-open", libraryId: "serangoon", libraryName: "Serangoon Library", date: "2011-03-11", precision: "exact", type: "opening", stateImpact: "active", lat: 1.350639, lng: 103.871813, title: "Serangoon Library opened", summary: "The rooftop library opened at nex.", address: "23 Serangoon Central, nex, Singapore 556083", source: "nlbApi" },
+      { id: "geylang-renovate", libraryId: "geylang-east", libraryName: "Geylang East Library", date: "2012", precision: "year", type: "renovation", stateImpact: "active", lat: 1.317437, lng: 103.885837, title: "Geylang East Library refurbished", summary: "The library was renovated and refurbished with a nature-themed look.", address: "50 Geylang East Ave 1, Singapore 389777", source: "nlbApi" },
+      { id: "nas-under-nlb", libraryId: "national-archives", libraryName: "National Archives of Singapore", date: "2012-11-01", precision: "exact", type: "archive", category: "archive", stateImpact: "active", lat: 1.2929673, lng: 103.8482995, title: "NAS brought under NLB", summary: "National Archives of Singapore came under the National Library Board from 1 November 2012.", address: "1 Canning Rise, Singapore 179868", source: "nasSecondary" },
+      { id: "chinatown-open", libraryId: "chinatown", libraryName: "Chinatown Library", date: "2013-01-31", precision: "exact", type: "opening", stateImpact: "active", lat: 1.285255, lng: 103.844943, title: "Chinatown Library opened", summary: "NLB's first volunteer-run library opened at Chinatown Point.", address: "133 New Bridge Road, Chinatown Point, Singapore 059413", source: "nlbApi" },
+      { id: "cheng-san-upgrade", libraryId: "cheng-san", libraryName: "Cheng San Library", date: "2013", precision: "year", type: "renovation", stateImpact: "active", lat: 1.372566, lng: 103.893775, title: "Cheng San Library upgraded", summary: "A comprehensive upgrading gave the library a new look and increased seating capacity.", address: "90 Hougang Avenue 10, Hougang Mall #03-11, Singapore 538766", source: "nlbApi" },
+      { id: "sembawang-relocate", libraryId: "sembawang", libraryName: "Sembawang Library", date: "2014-11-05", precision: "exact", type: "relocation", stateImpact: "active", lat: 1.448190, lng: 103.819499, title: "Sembawang Library relocated to Level 5", summary: "The library relocated within Sun Plaza and reopened on Level 5.", address: "30 Sembawang Drive, Sun Plaza #05-01, Singapore 757713", source: "nlbApi" },
+      { id: "orchard-reopen", libraryId: "orchard", libraryName: "Orchard Library", date: "2014-10-23", precision: "exact", type: "relocation", stateImpact: "active", lat: 1.300626, lng: 103.840191, title: "library@orchard reopened at orchardgateway", summary: "The design-focused library reopened at orchardgateway.", address: "277 Orchard Road, orchardgateway, Singapore 238858", source: "orchardSecondary", movedFrom: { lat: 1.3022417, lng: 103.8351819 } },
+      { id: "sengkang-close", libraryId: "sengkang", libraryName: "Sengkang Library", date: "2015-10-18", precision: "exact", type: "closure", stateImpact: "inactive", lat: 1.391322, lng: 103.894688, title: "Sengkang Library closed for major upgrading", summary: "The library closed for major upgrading works.", address: "1 Sengkang Square, Compass One, Singapore 545078", source: "nlbApi" },
+      { id: "pasir-ris-reopen", libraryId: "pasir-ris", libraryName: "Pasir Ris Library", date: "2015-11-28", precision: "exact", type: "renovation", stateImpact: "active", lat: 1.372351, lng: 103.949440, title: "Pasir Ris Library reopened after renovation", summary: "The renovated library was officially reopened.", address: "1 Pasir Ris Central St 3, White Sands, Singapore 518457", source: "nlbApi" },
+      { id: "sengkang-reopen", libraryId: "sengkang", libraryName: "Sengkang Library", date: "2017-03-18", precision: "exact", type: "renovation", stateImpact: "active", lat: 1.391322, lng: 103.894688, title: "Sengkang Library reopened", summary: "The upgraded library reopened with more space across Levels 3 and 4 of Compass One.", address: "1 Sengkang Square, Compass One, Singapore 545078", source: "nlbApi" },
+      { id: "bp-reopen", libraryId: "bukit-panjang", libraryName: "Bukit Panjang Library", date: "2017-07-01", precision: "exact", type: "renovation", stateImpact: "active", lat: 1.379930, lng: 103.764350, title: "Bukit Panjang Library reopened", summary: "The library reopened after extensive renovations.", address: "1 Jelebu Road, Bukit Panjang Plaza, Singapore 677743", source: "nlbApi" },
+      { id: "tampines-close", libraryId: "tampines", libraryName: "Tampines Library", date: "2017-06-04", precision: "exact", type: "closure", stateImpact: "inactive", lat: 1.3563099, lng: 103.9445283, title: "Tampines Avenue 7 site closed", summary: "The original Tampines Avenue 7 regional library closed before the branch shifted to Our Tampines Hub.", address: "31 Tampines Avenue 7, Singapore 529620", source: "tampinesSecondary" },
+      { id: "tampines-relocate", libraryId: "tampines", libraryName: "Tampines Library", date: "2017-08-05", precision: "exact", type: "relocation", stateImpact: "active", lat: 1.352391, lng: 103.940821, title: "Tampines Library reopened at Our Tampines Hub", summary: "The first regional public library moved from Tampines Avenue 7 to Our Tampines Hub.", address: "1 Tampines Walk, Our Tampines Hub, Singapore 528523", source: "nlbApi", movedFrom: { lat: 1.3563099, lng: 103.9445283 } },
+      { id: "bedok-close", libraryId: "bedok", libraryName: "Bedok Library", date: "2017-08-20", precision: "exact", type: "closure", stateImpact: "inactive", lat: 1.3268467, lng: 103.9308063, title: "Bedok North Street 1 site closed", summary: "The original Bedok Library site closed ahead of the move to Heartbeat@Bedok.", address: "21 Bedok North Street 1, Singapore 469659", source: "bedokSecondary" },
+      { id: "bedok-relocate", libraryId: "bedok", libraryName: "Bedok Library", date: "2017-10-28", precision: "exact", type: "relocation", stateImpact: "active", lat: 1.326971, lng: 103.931664, title: "Bedok Library reopened at Heartbeat@Bedok", summary: "After 32 years at the old site, Bedok Library shifted to Heartbeat@Bedok.", address: "11 Bedok North Street 1, Heartbeat@Bedok, Singapore 469662", source: "nlbApi", movedFrom: { lat: 1.3268467, lng: 103.9308063 } },
+      { id: "yishun-reopen-2018", libraryId: "yishun", libraryName: "Yishun Library", date: "2018-02-03", precision: "exact", type: "renovation", stateImpact: "active", lat: 1.429709, lng: 103.835803, title: "Yishun Library reopened after renovation", summary: "The library reopened with a revamped digital-focused space.", address: "930 Yishun Ave 2, Northpoint City, Singapore 769098", source: "nlbApi" },
+      { id: "harbourfront-open", libraryId: "harbourfront", libraryName: "Harbourfront Library", date: "2019-01-12", precision: "exact", type: "opening", stateImpact: "active", lat: 1.264305, lng: 103.822309, title: "Harbourfront Library opened", summary: "The coastal-themed library opened at VivoCity with a view of Sentosa.", address: "1 Harbourfront Walk, VivoCity, Singapore 098585", source: "nlbApi" },
+      { id: "nas-reopen-2019", libraryId: "national-archives", libraryName: "National Archives of Singapore", date: "2019-04-07", precision: "exact", type: "archive", category: "archive", stateImpact: "active", lat: 1.2929673, lng: 103.8482995, title: "NAS reopened after revamp", summary: "The Canning Rise NAS building reopened after an 18-month revamp with upgraded facilities.", address: "1 Canning Rise, Singapore 179868", source: "nasSecondary" },
+      { id: "cck-close", libraryId: "choa-chu-kang", libraryName: "Choa Chu Kang Library", date: "2019", precision: "year", type: "closure", stateImpact: "inactive", lat: 1.384953, lng: 103.745039, title: "Choa Chu Kang Library closed for renovation", summary: "The library closed for renovation before its larger reopening.", address: "21 Choa Chu Kang Ave 4, Lot One, Singapore 689812", source: "nlbApi" },
+      { id: "cck-reopen", libraryId: "choa-chu-kang", libraryName: "Choa Chu Kang Library", date: "2021-10-27", precision: "exact", type: "renovation", stateImpact: "active", lat: 1.384953, lng: 103.745039, title: "Choa Chu Kang Library reopened", summary: "The renovated library reopened about 30 percent bigger, with sustainability features.", address: "21 Choa Chu Kang Ave 4, Lot One, Singapore 689812", source: "nlbApi" },
+      { id: "marine-close", libraryId: "marine-parade", libraryName: "Marine Parade Library", date: "2022-05-09", precision: "exact", type: "closure", stateImpact: "inactive", lat: 1.304664, lng: 103.909581, title: "Marine Parade Library closed for renovations", summary: "The library closed for renovations and is currently listed as closed.", address: "278 Marine Parade Road, Marine Parade Community Building, Singapore 449282", source: "nlbApi" },
+      { id: "central-close", libraryId: "central", libraryName: "Central Library", date: "2022-06-13", precision: "exact", type: "closure", stateImpact: "inactive", lat: 1.297414, lng: 103.854235, title: "Central Library closed for overhaul", summary: "Central Library closed for its first full overhaul.", address: "100 Victoria Street, Singapore 188064", source: "nlbApi" },
+      { id: "punggol-open-a", libraryId: "punggol", libraryName: "Punggol Library", date: "2023-01-30", precision: "exact", type: "opening", stateImpact: "active", lat: 1.408710, lng: 103.904990, title: "Punggol Library opened first two floors", summary: "The first two floors opened to the public at One Punggol.", address: "1 Punggol Drive, One Punggol, Singapore 828629", source: "punggolSecondary" },
+      { id: "punggol-open-b", libraryId: "punggol", libraryName: "Punggol Library", date: "2023-04-05", precision: "exact", type: "opening", stateImpact: "active", lat: 1.408710, lng: 103.904990, title: "Punggol Library fully opened", summary: "The remaining levels opened, completing the five-storey regional library.", address: "1 Punggol Drive, One Punggol, Singapore 828629", source: "punggolSecondary" },
+      { id: "esplanade-close", libraryId: "esplanade", libraryName: "library@esplanade", date: "2023-06-30", precision: "exact", type: "closure", stateImpact: "inactive", lat: 1.2896478, lng: 103.8562673, title: "library@esplanade closed", summary: "The performing-arts library closed, with collections and programmes moving to the National Library Building.", address: "8 Raffles Avenue, Esplanade Mall, Singapore 039802", source: "esplanadeSecondary" },
+      { id: "central-reopen", libraryId: "central", libraryName: "Central Library", date: "2024-01-12", precision: "exact", type: "renovation", stateImpact: "active", lat: 1.297414, lng: 103.854235, title: "Central Library reopened after overhaul", summary: "The revamped Central Library reopened with a Singapore culture, literature and sustainability focus.", address: "100 Victoria Street, Singapore 188064", source: "nlbApi" },
+      { id: "orchard-close-2024", libraryId: "orchard", libraryName: "Orchard Library", date: "2024-10-28", precision: "exact", type: "closure", stateImpact: "inactive", lat: 1.300626, lng: 103.840191, title: "Orchard Library closed for revamp", summary: "Orchard Library closed for a revamp, with its design and applied-arts collection tied into Central Arts Library arrangements.", address: "277 Orchard Road, orchardgateway, Singapore 238858", source: "orchardSecondary" },
+      { id: "central-arts-open", libraryId: "central-arts", libraryName: "Central Arts Library", date: "2024-12-12", precision: "exact", type: "opening", stateImpact: "active", lat: 1.297414, lng: 103.854235, title: "Central Arts Library opened", summary: "The arts library opened at the National Library Building, bringing performing arts, design and applied arts resources into the Civic District.", address: "100 Victoria Street, Singapore 188064", source: "centralArtsSecondary" },
+      { id: "bb-close", libraryId: "bukit-batok", libraryName: "Bukit Batok Library", date: "2023-12-31", precision: "exact", type: "closure", stateImpact: "inactive", lat: 1.349491, lng: 103.749285, title: "Bukit Batok Library closed for full revamp", summary: "The library closed for a full revamp.", address: "1 Bukit Batok Central Link, West Mall, Singapore 658713", source: "nlbApi" },
+      { id: "bb-reopen", libraryId: "bukit-batok", libraryName: "Bukit Batok Library", date: "2026-03-27", precision: "exact", type: "renovation", stateImpact: "active", lat: 1.349491, lng: 103.749285, title: "Bukit Batok Library reopened", summary: "The revamped library reopened with sound-themed discovery features.", address: "1 Bukit Batok Central Link, West Mall, Singapore 658713", source: "nlbApi" },
+      { id: "cheng-san-current-close", libraryId: "cheng-san", libraryName: "Cheng San Library", date: "2026-06-15", precision: "as-of", type: "closure", stateImpact: "inactive", lat: 1.372566, lng: 103.893775, title: "Cheng San Library listed as closed for renovations", summary: "The current NLB branch note lists Cheng San Library as closed for renovations, with nearby alternatives at Sengkang, Serangoon and Punggol.", address: "90 Hougang Avenue 10, Hougang Mall #03-11, Singapore 538766", source: "nlbApi" }
+    ];
+
+    const typeInfo = {
+      opening: { label: "Openings", color: "#248a54" },
+      relocation: { label: "Relocations", color: "#0f8b8d" },
+      renovation: { label: "Renovations", color: "#f59e0b" },
+      closure: { label: "Closures", color: "#d11f3f" },
+      national: { label: "National lineage", color: "#6f55bd" },
+      archive: { label: "Archives / heritage", color: "#546a3a" }
+    };
+
+    const sortedEvents = events
+      .map(e => ({ ...e, year: Number(String(e.date).slice(0, 4)), sortKey: dateSortKey(e.date) }))
+      .sort((a, b) => a.sortKey.localeCompare(b.sortKey) || a.title.localeCompare(b.title));
+    const timelineYears = Array.from(new Set(sortedEvents.map(e => e.year))).sort((a, b) => a - b);
+    const slider = document.getElementById("timelineSlider");
+    const readout = document.getElementById("readout");
+    const filtersEl = document.getElementById("filters");
+    const searchInput = document.createElement("input");
+    let activeTypes = new Set(Object.keys(typeInfo));
+    let currentIndex = 0;
+    let playTimer = null;
+    const playDelays = [2000, 4000, 8000, 12000, 20000];
+    let playDelayIndex = 2;
+    let map = null;
+    let markerLayer = null;
+    let lineLayer = null;
+    let labelLayer = null;
+    let connectorLayer = null;
+    let currentLabelSites = [];
+    let currentLabelEvents = [];
+
+    slider.max = String(timelineYears.length - 1);
+    slider.value = String(currentIndex);
+
+    searchInput.className = "search";
+    searchInput.type = "search";
+    searchInput.placeholder = "Search library or place";
+    filtersEl.append(...Object.entries(typeInfo).map(([type, info]) => {
+      const btn = document.createElement("button");
+      btn.className = "filter-chip active";
+      btn.type = "button";
+      btn.dataset.type = type;
+      btn.textContent = info.label;
+      btn.addEventListener("click", () => {
+        if (activeTypes.has(type)) activeTypes.delete(type); else activeTypes.add(type);
+        btn.classList.toggle("active", activeTypes.has(type));
+        render();
+      });
+      return btn;
+    }), searchInput);
+
+    searchInput.addEventListener("input", render);
+    document.getElementById("backButton").addEventListener("click", () => { stopPlay(); updateIndex(currentIndex - 1); });
+    document.getElementById("nextButton").addEventListener("click", () => { stopPlay(); updateIndex(currentIndex + 1); });
+    document.getElementById("playButton").addEventListener("click", () => playTimer ? stopPlay() : startPlay());
+    document.getElementById("slowerButton").addEventListener("click", () => changePlaySpeed(1));
+    document.getElementById("fasterButton").addEventListener("click", () => changePlaySpeed(-1));
+    slider.addEventListener("input", e => { stopPlay(); updateIndex(Number(e.target.value)); });
+
+    updatePaceControls();
+    initSources();
+    initMap();
+    render();
+
+    function dateSortKey(date) {
+      const parts = String(date).split("-");
+      const y = parts[0].padStart(4, "0");
+      const m = (parts[1] || "12").padStart(2, "0");
+      const d = (parts[2] || "28").padStart(2, "0");
+      return `${y}-${m}-${d}`;
+    }
+
+    function formatDate(e) {
+      if (e.precision === "year") return String(e.year);
+      if (e.precision === "month") {
+        const [y, m] = e.date.split("-");
+        return `${monthName(Number(m))} ${y}`;
+      }
+      if (e.precision === "as-of") return `As of ${e.date}`;
+      const [y, m, d] = e.date.split("-");
+      return `${Number(d)} ${monthName(Number(m))} ${y}`;
+    }
+
+    function monthName(m) {
+      return ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][m - 1] || "";
+    }
+
+    function sourceLink(id) {
+      const s = sources[id] || sources.nlbApi;
+      return `<a href="${s.url}" target="_blank" rel="noopener">${escapeHtml(s.label.split(":")[0])}</a>`;
+    }
+
+    function matchesSearch(e, q) {
+      if (!q) return true;
+      const text = `${e.libraryName} ${e.title} ${e.summary} ${e.address}`.toLowerCase();
+      return text.includes(q);
+    }
+
+    function filteredEvents(year) {
+      const q = searchInput.value.trim().toLowerCase();
+      return sortedEvents.filter(e => e.year <= year && activeTypes.has(e.type) && matchesSearch(e, q));
+    }
+
+    function getStates(year) {
+      const states = new Map();
+      for (const e of sortedEvents) {
+        if (e.year > year) continue;
+        if (e.category === "archive") continue;
+        if (!matchesSearch(e, searchInput.value.trim().toLowerCase())) continue;
+        if (e.stateImpact === "active") {
+          states.set(e.libraryId, { active: true, name: e.libraryName, lat: e.lat, lng: e.lng, address: e.address, last: e });
+        } else if (e.stateImpact === "inactive") {
+          states.set(e.libraryId, { active: false, name: e.libraryName, lat: e.lat, lng: e.lng, address: e.address, last: e });
+        }
+      }
+      return Array.from(states.values()).filter(s => s.last.libraryId !== "mobile-library");
+    }
+
+    function getSiteStates(year) {
+      const q = searchInput.value.trim().toLowerCase();
+      const sites = new Map();
+      const shiftedFrom = new Map();
+      for (const e of sortedEvents) {
+        if (e.year > year || e.libraryId === "mobile-library") continue;
+        if (e.category === "archive" && !activeTypes.has("archive")) continue;
+        if (e.libraryId === "national-lineage" && !activeTypes.has("national")) continue;
+        if (!matchesSearch(e, q)) continue;
+        if (e.movedFrom) shiftedFrom.set(coordKey(e.libraryId, e.movedFrom.lat, e.movedFrom.lng), e);
+        if (!["active", "inactive", "context", "none"].includes(e.stateImpact)) continue;
+
+        const key = coordKey(e.libraryId, e.lat, e.lng);
+        let site = sites.get(key);
+        if (!site && e.stateImpact === "none") continue;
+        if (!site) {
+          site = {
+            key,
+            libraryId: e.libraryId,
+            name: e.libraryName,
+            lat: e.lat,
+            lng: e.lng,
+            address: e.address,
+            status: "lineage",
+            active: false,
+            visualType: "national",
+            first: e,
+            last: e,
+            events: []
+          };
+          sites.set(key, site);
+        }
+
+        site.events.push(e);
+        site.name = e.libraryName;
+        site.address = e.address;
+        site.last = e;
+
+        site.category = e.category || site.category || "public-library";
+
+        if (e.stateImpact === "active") {
+          if (site.category === "archive") {
+            site.status = "archive";
+            site.active = false;
+            site.visualType = "archive";
+          } else {
+            site.status = "active";
+            site.active = true;
+            site.visualType = siteVisualType(site);
+          }
+        } else if (e.stateImpact === "inactive") {
+          site.status = "closed";
+          site.active = false;
+          site.visualType = "closure";
+        } else if (e.stateImpact === "context") {
+          site.status = e.type === "closure" ? "closed" : "lineage";
+          site.active = false;
+          site.visualType = e.type === "closure" ? "closure" : "national";
+        }
+      }
+
+      shiftedFrom.forEach((target, key) => {
+        const site = sites.get(key);
+        if (!site || samePlace(site, target)) return;
+        site.status = "shifted";
+        site.active = false;
+        site.visualType = "relocation";
+        site.shiftedTo = target;
+        site.last = target;
+      });
+
+      return Array.from(sites.values()).sort((a, b) => {
+        const rank = { active: 0, archive: 1, shifted: 2, closed: 3, lineage: 4 };
+        return (rank[a.status] ?? 9) - (rank[b.status] ?? 9) || a.name.localeCompare(b.name) || a.address.localeCompare(b.address);
+      });
+    }
+
+    function coordKey(libraryId, lat, lng) {
+      return `${libraryId}|${Number(lat).toFixed(5)}|${Number(lng).toFixed(5)}`;
+    }
+
+    function samePlace(site, e) {
+      return coordKey(site.libraryId, site.lat, site.lng) === coordKey(e.libraryId, e.lat, e.lng);
+    }
+
+    function siteVisualType(site) {
+      if (site.status === "lineage") return "national";
+      if (site.status === "archive" || site.category === "archive") return "archive";
+      if (site.status === "closed") return "closure";
+      if (site.status === "shifted") return "relocation";
+      if (["relocation", "renovation"].includes(site.last.type)) return site.last.type;
+      return "opening";
+    }
+
+    function getLineageSegments(year) {
+      const q = searchInput.value.trim().toLowerCase();
+      const segments = [];
+      const seen = new Set();
+      const lastByLibrary = new Map();
+
+      for (const e of sortedEvents) {
+        if (e.year > year || e.libraryId === "mobile-library") continue;
+        if (!matchesSearch(e, q)) continue;
+        if (e.type === "relocation" && !activeTypes.has("relocation")) continue;
+        if (e.libraryId === "national-lineage" && !activeTypes.has("national")) continue;
+        if (e.type === "relocation" && e.movedFrom) {
+          addSegment(e.libraryId, e.libraryName, e.movedFrom, e, e);
+        }
+        if (e.libraryId === "national-lineage") {
+          const previous = lastByLibrary.get(e.libraryId);
+          if (previous && coordKey(e.libraryId, previous.lat, previous.lng) !== coordKey(e.libraryId, e.lat, e.lng)) {
+            addSegment(e.libraryId, "National Library lineage", previous, e, e);
+          }
+          lastByLibrary.set(e.libraryId, e);
+        }
+      }
+
+      function addSegment(libraryId, name, from, to, event) {
+        const key = `${libraryId}|${Number(from.lat).toFixed(5)},${Number(from.lng).toFixed(5)}>${Number(to.lat).toFixed(5)},${Number(to.lng).toFixed(5)}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        segments.push({ libraryId, name, from, to, event });
+      }
+
+      return segments;
+    }
+
+    function selectedYearEvents(year) {
+      const q = searchInput.value.trim().toLowerCase();
+      return sortedEvents.filter(e => e.year === year && activeTypes.has(e.type) && matchesSearch(e, q));
+    }
+
+    function updateIndex(idx) {
+      currentIndex = Math.max(0, Math.min(timelineYears.length - 1, idx));
+      slider.value = String(currentIndex);
+      render();
+    }
+
+    function startPlay() {
+      stopPlay();
+      document.getElementById("playButton").textContent = "Pause";
+      playTimer = setInterval(() => updateIndex(currentIndex + 1 >= timelineYears.length ? 0 : currentIndex + 1), playDelays[playDelayIndex]);
+    }
+
+    function stopPlay() {
+      if (playTimer) clearInterval(playTimer);
+      playTimer = null;
+      document.getElementById("playButton").textContent = "Play";
+    }
+
+    function changePlaySpeed(delta) {
+      const wasPlaying = Boolean(playTimer);
+      playDelayIndex = Math.max(0, Math.min(playDelays.length - 1, playDelayIndex + delta));
+      updatePaceControls();
+      if (wasPlaying) startPlay();
+    }
+
+    function updatePaceControls() {
+      const delay = playDelays[playDelayIndex];
+      document.getElementById("paceLabel").textContent = `${delay / 1000}s / step`;
+      document.getElementById("fasterButton").disabled = playDelayIndex === 0;
+      document.getElementById("slowerButton").disabled = playDelayIndex === playDelays.length - 1;
+    }
+
+    function render() {
+      const year = timelineYears[currentIndex];
+      const yearEvents = selectedYearEvents(year);
+      const shown = filteredEvents(year);
+      const states = getStates(year);
+      const siteStates = getSiteStates(year);
+      const activeStates = states.filter(s => s.active);
+
+      readout.textContent = String(year);
+      document.getElementById("yearLabel").textContent = String(year);
+      document.getElementById("activeCount").textContent = String(activeStates.length);
+      document.getElementById("eventCount").textContent = String(shown.length);
+      document.getElementById("metricActive").textContent = String(activeStates.length);
+      document.getElementById("metricSites").textContent = String(siteStates.length);
+      document.getElementById("metricYearEvents").textContent = String(yearEvents.length);
+      document.getElementById("metricPrecision").textContent = precisionSummary(yearEvents.length ? yearEvents : shown.slice(-8));
+      document.getElementById("panelTitle").textContent = titleForYear(year);
+      document.getElementById("panelNote").textContent = noteForYear(year, activeStates.length, siteStates.length, yearEvents.length);
+      document.getElementById("hudNote").textContent = yearEvents.length
+        ? `${yearEvents.length} dated change${yearEvents.length === 1 ? "" : "s"} in ${year}; labels attach to dots, with dotted paths for shifts.`
+        : "No same-year event in the active filters; labels attach to dots and the site register keeps every mapped site accessible.";
+
+      renderYearEvents(year, yearEvents, shown);
+      renderLibraryList(siteStates);
+      renderBars();
+      drawMap(year, siteStates, yearEvents);
+    }
+
+    function precisionSummary(list) {
+      const p = new Set(list.map(e => e.precision));
+      if (!list.length) return "None";
+      if (p.size === 1) return p.has("exact") ? "Exact" : Array.from(p)[0];
+      return "Mixed";
+    }
+
+    function titleForYear(year) {
+      if (year < 1960) return "From institution library to public service";
+      if (year < 1980) return "Branch libraries reach new towns";
+      if (year < 1995) return "Regional and computerised services emerge";
+      if (year < 2010) return "Mall libraries and regional anchors";
+      if (year < 2020) return "Libraries move into integrated hubs";
+      return "Renewal, access and specialised collections";
+    }
+
+    function noteForYear(year, active, sites, changes) {
+      return `${active} active public-library location${active === 1 ? "" : "s"} are represented by ${year}, with ${sites} mapped public, lineage and archives/heritage site${sites === 1 ? "" : "s"} retained for context. ${changes} event${changes === 1 ? "" : "s"} match the selected year and active filters.`;
+    }
+
+    function renderYearEvents(year, yearEvents, shown) {
+      const list = document.getElementById("yearEvents");
+      const items = yearEvents.length ? yearEvents : shown.slice(-6).reverse();
+      list.innerHTML = items.length ? items.map(eventCard).join("") : `<li class="event-card"><span class="event-title">No matching events yet</span><div class="event-text">Try enabling more filters or moving later in the timeline.</div></li>`;
+      if (!yearEvents.length && shown.length) {
+        list.firstElementChild?.insertAdjacentHTML("beforebegin", `<li class="event-card"><span class="event-title">Nearest earlier changes</span><div class="event-text">No event lands exactly in ${year}, so the list shows the latest earlier matching changes.</div></li>`);
+      }
+    }
+
+    function eventCard(e) {
+      const type = typeInfo[e.type] || typeInfo.opening;
+      return `<li class="event-card ${e.type}">
+        <div class="event-top"><span class="event-date">${formatDate(e)}</span><span class="event-kind">${escapeHtml(type.label)}</span></div>
+        <span class="event-title">${escapeHtml(e.libraryName)}: ${escapeHtml(e.title)}</span>
+        <div class="event-text">${escapeHtml(e.summary)}</div>
+        <div class="event-meta"><span>${escapeHtml(e.address)}</span><span>Precision: ${escapeHtml(e.precision)}</span><span>${sourceLink(e.source)}</span></div>
+      </li>`;
+    }
+
+    function renderLibraryList(states) {
+      const list = document.getElementById("libraryList");
+      const items = states
+        .filter(s => s.libraryId !== "mobile-library")
+        .sort((a, b) => a.name.localeCompare(b.name) || a.address.localeCompare(b.address));
+      list.innerHTML = items.map(s => `<li class="library-card ${s.status}">
+        <div><div class="name">${escapeHtml(s.name)}</div><div class="addr">${escapeHtml(s.address)}<br>${siteDescription(s)}</div></div>
+        <span class="status ${s.status === "closed" ? "inactive" : s.status}">${siteStatusLabel(s)}</span>
+      </li>`).join("") || `<li class="library-card"><div><div class="name">No matching libraries</div><div class="addr">Adjust search or filters.</div></div></li>`;
+    }
+
+    function siteStatusLabel(site) {
+      return ({ active: "Active", shifted: "Shifted", closed: "Closed", lineage: "Lineage", archive: "Archive" })[site.status] || "Mapped";
+    }
+
+    function siteDescription(site) {
+      if (site.status === "shifted" && site.shiftedTo) {
+        return `Shifted to ${escapeHtml(site.shiftedTo.address)} on ${formatDate(site.shiftedTo)}. Former site retained.`;
+      }
+      if (site.status === "archive") {
+        return `Archive / heritage marker: ${formatDate(site.last)} - ${escapeHtml(site.last.title)}.`;
+      }
+      if (site.status === "lineage") {
+        return `Lineage marker: ${formatDate(site.last)} - ${escapeHtml(site.last.title)}.`;
+      }
+      return `Latest at this site: ${formatDate(site.last)} - ${escapeHtml(site.last.title)}.`;
+    }
+
+    function renderBars() {
+      const years = [1960, 1970, 1980, 1990, 2000, 2010, 2026];
+      const counts = years.map(y => getStates(y).filter(s => s.active).length);
+      const max = Math.max(...counts, 1);
+      document.getElementById("bars").innerHTML = years.map((y, i) => `<div class="bar">
+        <div class="bar-value">${counts[i]}</div>
+        <div class="bar-fill" style="--h:${Math.max(10, counts[i] / max * 150)}px"></div>
+        <div class="bar-label">${y}</div>
+      </div>`).join("");
+    }
+
+    function initSources() {
+      document.getElementById("sourceList").innerHTML = Object.values(sources).map(s => `<li><a href="${s.url}" target="_blank" rel="noopener">${escapeHtml(s.label)}</a></li>`).join("");
+    }
+
+    function initMap() {
+      if (!window.L) {
+        document.getElementById("map").style.display = "none";
+        document.getElementById("fallbackMap").style.display = "block";
+        return;
+      }
+      map = L.map("map", {
+        zoomControl: false,
+        scrollWheelZoom: true,
+        zoomSnap: .25,
+        zoomDelta: .5
+      });
+      window.__libraryTimelineMap = map;
+      L.control.zoom({ position: "bottomleft" }).addTo(map);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(map);
+      markerLayer = L.layerGroup().addTo(map);
+      lineLayer = L.layerGroup().addTo(map);
+      connectorLayer = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      connectorLayer.setAttribute("class", "map-label-connectors");
+      map.getContainer().appendChild(connectorLayer);
+      labelLayer = L.DomUtil.create("div", "map-label-layer", map.getContainer());
+      map.on("zoomend moveend resize", () => renderSmartLabels(currentLabelSites, currentLabelEvents));
+      setDefaultMapView();
+      setTimeout(() => {
+        const container = document.querySelector("#map .leaflet-tile-container");
+        if (!container || !container.children.length) {
+          document.getElementById("map").style.display = "none";
+          document.getElementById("fallbackMap").style.display = "block";
+          render();
+        }
+      }, 1800);
+    }
+
+    function setDefaultMapView() {
+      const size = map.getSize();
+      if (size.x >= 1150 && size.y >= 700) {
+        map.setView([1.36, 103.827], 12.25, { animate: false });
+        return;
+      }
+      const islandDetailBounds = L.latLngBounds(
+        [1.245, 103.605],
+        [1.47, 104.035]
+      );
+      map.fitBounds(islandDetailBounds, {
+        animate: false,
+        paddingTopLeft: [8, 8],
+        paddingBottomRight: [8, 8],
+        maxZoom: 12.25
+      });
+    }
+
+    function drawMap(year, states, yearEvents) {
+      const segments = getLineageSegments(year);
+      currentLabelSites = states;
+      currentLabelEvents = yearEvents;
+      if (map && markerLayer) {
+        markerLayer.clearLayers();
+        lineLayer.clearLayers();
+        segments.forEach(s => addLineageSegment(s));
+        states.forEach(s => addLeafletMarker(
+          s.lat,
+          s.lng,
+          s.visualType,
+          markerTitle(s),
+          markerPopup(s),
+          s.status === "active" ? 8 : 7,
+          s.status === "active" ? .95 : .72,
+          "",
+          s.status,
+          s.key,
+          mapLabel(s)
+        ));
+        yearEvents.forEach(e => addLeafletMarker(e.lat, e.lng, e.type, e.libraryName, `${escapeHtml(formatDate(e))}<br>${escapeHtml(e.title)}<br>${escapeHtml(e.address)}`, 13, .28, "", "selected", e.id, mapLabel({ name: e.libraryName, libraryId: e.libraryId })));
+        renderSmartLabels(states, yearEvents);
+      }
+      renderFallbackMap(states, yearEvents, segments);
+    }
+
+    function addLineageSegment(segment) {
+      const line = L.polyline([[segment.from.lat, segment.from.lng], [segment.to.lat, segment.to.lng]], {
+        color: segment.libraryId === "national-lineage" ? typeInfo.national.color : typeInfo.relocation.color,
+        weight: 3,
+        opacity: .78,
+        dashArray: "2 8",
+        lineCap: "round"
+      }).bindTooltip(`${escapeHtml(segment.name)} lineage: ${escapeHtml(formatDate(segment.event))}`, {
+        sticky: true,
+        direction: "top"
+      });
+      line.addTo(lineLayer);
+    }
+
+    function addLeafletMarker(lat, lng, type, title, html, radius, opacity, label, status, dataKey = "", labelText = "") {
+      const color = typeInfo[type]?.color || "#2d6cdf";
+      const marker = L.circleMarker([lat, lng], {
+        radius,
+        color: "#ffffff",
+        weight: 2,
+        fillColor: color,
+        fillOpacity: opacity,
+        opacity: 1,
+        className: `map-marker ${status || ""}`
+      }).bindPopup(`<strong>${escapeHtml(title)}</strong><br>${html}`);
+      marker.addTo(markerLayer);
+      const el = marker.getElement?.();
+      if (el) {
+        el.dataset.key = dataKey || "";
+        el.dataset.label = labelText || title || "";
+        el.dataset.status = status || "";
+      }
+    }
+
+    function renderSmartLabels(states = currentLabelSites, yearEvents = currentLabelEvents) {
+      if (!map || !labelLayer) return;
+      currentLabelSites = states || [];
+      currentLabelEvents = yearEvents || [];
+      labelLayer.innerHTML = "";
+
+      const bounds = map.getBounds().pad(.08);
+      const size = map.getSize();
+      if (connectorLayer) {
+        connectorLayer.innerHTML = "";
+        connectorLayer.setAttribute("viewBox", `0 0 ${size.x} ${size.y}`);
+      }
+      const selectedKeys = new Set(currentLabelEvents.map(e => coordKey(e.libraryId, e.lat, e.lng)));
+      const stateKeys = new Set();
+      const candidates = [];
+
+      currentLabelSites.forEach(site => {
+        if (!Number.isFinite(site.lat) || !Number.isFinite(site.lng)) return;
+        if (!bounds.contains([site.lat, site.lng])) return;
+        const key = coordKey(site.libraryId, site.lat, site.lng);
+        const selected = selectedKeys.has(key);
+        stateKeys.add(key);
+        candidates.push({
+          id: site.key,
+          lat: site.lat,
+          lng: site.lng,
+          text: mapLabel(site),
+          status: site.status || "",
+          libraryId: site.libraryId,
+          selected,
+          anchor: labelAnchor(site.libraryId, site.status, mapLabel(site)),
+          priority: labelPriority(site.status, site.libraryId, selected, mapLabel(site))
+        });
+      });
+
+      currentLabelEvents.forEach(event => {
+        if (!Number.isFinite(event.lat) || !Number.isFinite(event.lng)) return;
+        if (!bounds.contains([event.lat, event.lng])) return;
+        const key = coordKey(event.libraryId, event.lat, event.lng);
+        if (stateKeys.has(key)) return;
+        const status = eventLabelStatus(event);
+        const text = mapLabel({ name: event.libraryName, libraryId: event.libraryId });
+        candidates.push({
+          id: event.id,
+          lat: event.lat,
+          lng: event.lng,
+          text,
+          status,
+          libraryId: event.libraryId,
+          selected: true,
+          anchor: labelAnchor(event.libraryId, status, text),
+          priority: labelPriority(status, event.libraryId, true, text) + 120
+        });
+      });
+
+      const blocked = relativeAvoidRects(map.getContainer(), [".map-hud", "#map .leaflet-control-zoom", "#map .leaflet-control-attribution"]);
+      const placed = [];
+      const hiddenLabels = [];
+      let hidden = 0;
+      candidates
+        .sort((a, b) => b.priority - a.priority || a.text.localeCompare(b.text))
+        .forEach(candidate => {
+          const point = map.latLngToContainerPoint([candidate.lat, candidate.lng]);
+          if (point.x < -80 || point.y < -80 || point.x > size.x + 80 || point.y > size.y + 80) {
+            hidden += 1;
+            hiddenLabels.push(candidate.text);
+            return;
+          }
+
+          const label = document.createElement("span");
+          label.className = `smart-map-label ${candidate.status}${candidate.selected ? " selected" : ""}`;
+          label.textContent = candidate.text;
+          label.style.left = "-1000px";
+          label.style.top = "-1000px";
+          labelLayer.appendChild(label);
+
+          const width = Math.ceil(label.offsetWidth);
+          const height = Math.ceil(label.offsetHeight);
+          const rect = chooseLabelRect(point, width, height, blocked.concat(placed), size, candidate.anchor);
+          if (!rect) {
+            label.remove();
+            hidden += 1;
+            hiddenLabels.push(candidate.text);
+            return;
+          }
+
+          label.dataset.key = candidate.id;
+          label.dataset.anchor = rect.anchor || "";
+          label.dataset.markerX = String(Math.round(point.x));
+          label.dataset.markerY = String(Math.round(point.y));
+          label.style.left = `${rect.left}px`;
+          label.style.top = `${rect.top}px`;
+          label.dataset.linkDistance = String(Math.round(addLabelConnector(candidate, point, rect)));
+          placed.push(inflateRect(rect, 4));
+        });
+
+      labelLayer.dataset.placed = String(placed.length);
+      labelLayer.dataset.hidden = String(hidden);
+      labelLayer.dataset.total = String(candidates.length);
+      labelLayer.dataset.hiddenLabels = hiddenLabels.join("|");
+      labelLayer.dataset.zoom = String(map.getZoom());
+      window.__libraryTimelineLabelStats = {
+        placed: placed.length,
+        hidden,
+        total: candidates.length,
+        zoom: map.getZoom(),
+        hiddenLabels
+      };
+    }
+
+    function addLabelConnector(candidate, point, rect) {
+      const target = labelEdgePoint(point, rect);
+      const distance = Math.hypot(target.x - point.x, target.y - point.y);
+      if (!connectorLayer || distance < 18) return distance;
+
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      line.setAttribute("class", `label-connector ${candidate.status || ""}${candidate.selected ? " selected" : ""}`);
+      line.setAttribute("x1", point.x.toFixed(1));
+      line.setAttribute("y1", point.y.toFixed(1));
+      line.setAttribute("x2", target.x.toFixed(1));
+      line.setAttribute("y2", target.y.toFixed(1));
+      line.dataset.key = candidate.id || "";
+      line.dataset.label = candidate.text || "";
+      connectorLayer.appendChild(line);
+      return distance;
+    }
+
+    function labelEdgePoint(point, rect) {
+      return {
+        x: clamp(point.x, rect.left, rect.right),
+        y: clamp(point.y, rect.top, rect.bottom)
+      };
+    }
+
+    function labelEdgeDistance(point, rect) {
+      const target = labelEdgePoint(point, rect);
+      return Math.hypot(target.x - point.x, target.y - point.y);
+    }
+
+    function labelPriority(status, libraryId, selected, text) {
+      const statusScore = { active: 760, archive: 680, shifted: 450, closed: 440, lineage: 260 };
+      let score = selected ? 120 : 0;
+      score += statusScore[status] || 320;
+      if (/Geylang East/.test(text)) score += 220;
+      if (/Toa Payoh/.test(text)) score += 180;
+      if (/library@esplanade/.test(text)) score += 180;
+      if (status === "archive" && /National Archives|Former Ford/.test(text)) score += 260;
+      if (libraryId === "national-lineage") {
+        score += 70;
+        if (/National|Stamford|Victoria/.test(text)) score += 620;
+        if (/Raffles|Singapore|Library roots/.test(text)) score += 20;
+      }
+      return score - Math.min(String(text).length, 28);
+    }
+
+    function eventLabelStatus(event) {
+      if (event.category === "archive") return "archive";
+      if (event.libraryId === "national-lineage") return "lineage";
+      if (event.type === "closure") return "closed";
+      if (event.type === "relocation") return "shifted";
+      return event.type || "";
+    }
+
+    function labelAnchor(libraryId, status, text) {
+      const anchors = {
+        "ang-mo-kio": "nw",
+        bedok: "sw",
+        bishan: "sw",
+        "bukit-batok": "w",
+        "bukit-panjang": "nw",
+        central: "nw",
+        "central-arts": "nw",
+        "cheng-san": "se",
+        chinatown: "se",
+        "choa-chu-kang": "w",
+        clementi: "nw",
+        esplanade: "e",
+        "former-ford-factory": "e",
+        "geylang-east": "se",
+        harbourfront: "nw",
+        jurong: "w",
+        "jurong-west": "w",
+        "marine-parade": "se",
+        "national-archives": "e",
+        "national-lineage": "se",
+        orchard: "w",
+        "pasir-ris": "e",
+        punggol: "ne",
+        queenstown: "sw",
+        sembawang: "n",
+        sengkang: "ne",
+        serangoon: "n",
+        tampines: "e",
+        "toa-payoh": "nw",
+        woodlands: "w",
+        yishun: "ne"
+      };
+      if (status === "archive") return anchors[libraryId] || "se";
+      if (libraryId === "national-lineage") {
+        if (/Stamford|National/.test(text)) return "ne";
+        if (/Raffles/.test(text)) return "se";
+        if (/Singapore|Library roots/.test(text)) return "sw";
+      }
+      return anchors[libraryId] || "e";
+    }
+
+    function chooseLabelRect(point, width, height, blocked, size, anchor = "e") {
+      const gap = 12;
+      const shortGap = 7;
+      const maxEdgeDistance = 92;
+      const localOffsets = offsetsForAnchor(anchor, width, height, gap, shortGap);
+
+      for (const offset of localOffsets) {
+        const rect = makeRect(point.x + offset.dx, point.y + offset.dy, width, height);
+        rect.anchor = offset.anchor;
+        if (labelEdgeDistance(point, rect) <= maxEdgeDistance && rectInside(rect, size) && !collides(inflateRect(rect, 2), blocked)) return rect;
+      }
+
+      for (const backupAnchor of fallbackAnchors(anchor)) {
+        const backupOffsets = offsetsForAnchor(backupAnchor, width, height, gap, shortGap);
+        for (const offset of backupOffsets) {
+          const rect = makeRect(point.x + offset.dx, point.y + offset.dy, width, height);
+          rect.anchor = offset.anchor;
+          if (labelEdgeDistance(point, rect) <= maxEdgeDistance && rectInside(rect, size) && !collides(inflateRect(rect, 2), blocked)) return rect;
+        }
+      }
+
+      return null;
+    }
+
+    function fallbackAnchors(anchor) {
+      return ({
+        e: ["ne", "se", "n", "s", "w"],
+        w: ["nw", "sw", "n", "s", "e"],
+        n: ["ne", "nw", "e", "w", "s"],
+        s: ["se", "sw", "e", "w", "n"],
+        ne: ["e", "n", "se", "nw", "s", "w"],
+        nw: ["w", "n", "sw", "ne", "s", "e"],
+        se: ["e", "s", "ne", "sw", "n", "w"],
+        sw: ["w", "s", "nw", "se", "n", "e"]
+      })[anchor] || ["ne", "se", "n", "s", "w"];
+    }
+
+    function offsetsForAnchor(anchor, width, height, gap, shortGap) {
+      const base = offsetForAnchor(anchor, width, height, gap, shortGap);
+      const verticalStep = height + 7;
+      const horizontalStep = Math.min(width + 7, 92);
+      const sideSlides = {
+        e: [{ x: 0, y: 0 }, { x: 0, y: verticalStep }, { x: 0, y: -verticalStep }, { x: 0, y: verticalStep * 2 }, { x: 0, y: -verticalStep * 2 }],
+        w: [{ x: 0, y: 0 }, { x: 0, y: verticalStep }, { x: 0, y: -verticalStep }, { x: 0, y: verticalStep * 2 }, { x: 0, y: -verticalStep * 2 }],
+        n: [{ x: 0, y: 0 }, { x: horizontalStep, y: 0 }, { x: -horizontalStep, y: 0 }, { x: horizontalStep * 2, y: 0 }, { x: -horizontalStep * 2, y: 0 }],
+        s: [{ x: 0, y: 0 }, { x: horizontalStep, y: 0 }, { x: -horizontalStep, y: 0 }, { x: horizontalStep * 2, y: 0 }, { x: -horizontalStep * 2, y: 0 }],
+        ne: [{ x: 0, y: 0 }, { x: 0, y: -verticalStep }, { x: horizontalStep * .55, y: 0 }, { x: 0, y: -verticalStep * 2 }],
+        nw: [{ x: 0, y: 0 }, { x: 0, y: -verticalStep }, { x: -horizontalStep * .55, y: 0 }, { x: 0, y: -verticalStep * 2 }],
+        se: [{ x: 0, y: 0 }, { x: 0, y: verticalStep }, { x: horizontalStep * .55, y: 0 }, { x: 0, y: verticalStep * 2 }],
+        sw: [{ x: 0, y: 0 }, { x: 0, y: verticalStep }, { x: -horizontalStep * .55, y: 0 }, { x: 0, y: verticalStep * 2 }]
+      };
+      return (sideSlides[anchor] || sideSlides.e).map(slide => ({
+        anchor: base.anchor,
+        dx: base.dx + slide.x,
+        dy: base.dy + slide.y
+      }));
+    }
+
+    function offsetForAnchor(anchor, width, height, gap, shortGap, ring) {
+      const extra = ring || 0;
+      return ({
+        e: { anchor, dx: gap + extra, dy: -height / 2 },
+        w: { anchor, dx: -width - gap - extra, dy: -height / 2 },
+        n: { anchor, dx: -width / 2, dy: -height - gap - extra },
+        s: { anchor, dx: -width / 2, dy: gap + extra },
+        ne: { anchor, dx: gap + extra, dy: -height - shortGap - extra / 2 },
+        nw: { anchor, dx: -width - gap - extra, dy: -height - shortGap - extra / 2 },
+        se: { anchor, dx: gap + extra, dy: shortGap + extra / 2 },
+        sw: { anchor, dx: -width - gap - extra, dy: shortGap + extra / 2 }
+      })[anchor] || { anchor: "e", dx: gap + extra, dy: -height / 2 };
+    }
+
+    function renderFallbackLabels(parent, states, yearEvents) {
+      if (parent.offsetParent === null) return;
+      const width = parent.clientWidth;
+      const height = parent.clientHeight;
+      if (!width || !height) return;
+      const selectedKeys = new Set(yearEvents.map(e => coordKey(e.libraryId, e.lat, e.lng)));
+      const candidates = states.map(site => {
+        const p = project(site.lat, site.lng);
+        const selected = selectedKeys.has(coordKey(site.libraryId, site.lat, site.lng));
+        return {
+          x: p.x / 100 * width,
+          y: p.y / 100 * height,
+          text: mapLabel(site),
+          status: site.status || "",
+          selected,
+          anchor: labelAnchor(site.libraryId, site.status, mapLabel(site)),
+          priority: labelPriority(site.status, site.libraryId, selected, mapLabel(site))
+        };
+      }).sort((a, b) => b.priority - a.priority || a.text.localeCompare(b.text));
+
+      const blocked = relativeAvoidRects(parent, [".map-hud"]);
+      const placed = [];
+      candidates.forEach(candidate => {
+        const label = document.createElement("span");
+        label.className = `fallback-label ${candidate.status}${candidate.selected ? " selected" : ""}`;
+        label.textContent = candidate.text;
+        label.style.left = "-1000px";
+        label.style.top = "-1000px";
+        parent.appendChild(label);
+        const rect = chooseLabelRect(candidate, Math.ceil(label.offsetWidth), Math.ceil(label.offsetHeight), blocked.concat(placed), { x: width, y: height }, candidate.anchor);
+        if (!rect) {
+          label.remove();
+          return;
+        }
+        label.dataset.anchor = rect.anchor || "";
+        label.style.left = `${rect.left}px`;
+        label.style.top = `${rect.top}px`;
+        label.style.transform = "none";
+        placed.push(inflateRect(rect, 4));
+      });
+    }
+
+    function relativeAvoidRects(root, selectors) {
+      const rootRect = root.getBoundingClientRect();
+      return selectors.flatMap(selector => Array.from(document.querySelectorAll(selector))).map(el => {
+        const rect = el.getBoundingClientRect();
+        const left = Math.max(0, rect.left - rootRect.left);
+        const top = Math.max(0, rect.top - rootRect.top);
+        const right = Math.min(rootRect.width, rect.right - rootRect.left);
+        const bottom = Math.min(rootRect.height, rect.bottom - rootRect.top);
+        if (right <= 0 || bottom <= 0 || left >= rootRect.width || top >= rootRect.height || right <= left || bottom <= top) return null;
+        return inflateRect(makeRect(left, top, right - left, bottom - top), 8);
+      }).filter(Boolean);
+    }
+
+    function makeRect(left, top, width, height) {
+      const l = Math.round(left);
+      const t = Math.round(top);
+      const w = Math.ceil(width);
+      const h = Math.ceil(height);
+      return { left: l, top: t, right: l + w, bottom: t + h, width: w, height: h };
+    }
+
+    function inflateRect(rect, amount) {
+      return {
+        left: rect.left - amount,
+        top: rect.top - amount,
+        right: rect.right + amount,
+        bottom: rect.bottom + amount,
+        width: rect.width + amount * 2,
+        height: rect.height + amount * 2
+      };
+    }
+
+    function rectInside(rect, size) {
+      return rect.left >= 4 && rect.top >= 4 && rect.right <= size.x - 4 && rect.bottom <= size.y - 4;
+    }
+
+    function collides(rect, others) {
+      return others.some(other => !(rect.right <= other.left || rect.left >= other.right || rect.bottom <= other.top || rect.top >= other.bottom));
+    }
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function renderFallbackMap(states, yearEvents, segments) {
+      const el = document.getElementById("fallbackMap");
+      Array.from(el.querySelectorAll(".fallback-marker, .fallback-label, .fallback-line")).forEach(n => n.remove());
+      const svg = el.querySelector("svg");
+      segments.forEach(s => addFallbackLine(svg, s));
+      states.forEach(s => addFallbackMarker(el, s.lat, s.lng, s.visualType, markerTitle(s), s.status === "active" ? "active" : ""));
+      yearEvents.forEach(e => addFallbackMarker(el, e.lat, e.lng, e.type, `${e.libraryName}: ${e.title}`, "selected"));
+      renderFallbackLabels(el, states, yearEvents);
+    }
+
+    function addFallbackLine(svg, segment) {
+      if (!svg) return;
+      const from = project(segment.from.lat, segment.from.lng);
+      const to = project(segment.to.lat, segment.to.lng);
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      line.setAttribute("x1", from.x);
+      line.setAttribute("y1", from.y);
+      line.setAttribute("x2", to.x);
+      line.setAttribute("y2", to.y);
+      line.setAttribute("class", "fallback-line");
+      if (segment.libraryId === "national-lineage") line.style.stroke = typeInfo.national.color;
+      svg.appendChild(line);
+    }
+
+    function addFallbackMarker(parent, lat, lng, type, title, extra) {
+      const p = project(lat, lng);
+      const m = document.createElement("span");
+      m.className = `fallback-marker ${extra || ""}`;
+      m.style.left = `${p.x}%`;
+      m.style.top = `${p.y}%`;
+      m.style.background = typeInfo[type]?.color || "#2d6cdf";
+      m.title = title;
+      parent.appendChild(m);
+    }
+
+    function markerTitle(site) {
+      if (site.status === "shifted") return `${site.name} (former site)`;
+      if (site.status === "closed") return `${site.name} (closed)`;
+      return site.name;
+    }
+
+    function markerPopup(site) {
+      return `${escapeHtml(site.address)}<br><strong>Status:</strong> ${escapeHtml(siteStatusLabel(site))}<br>${siteDescription(site)}`;
+    }
+
+    function mapLabel(site) {
+      if (site.name === "National Library lineage") return "Library roots";
+      if (site.libraryId === "national-archives") return "National Archives";
+      if (site.libraryId === "former-ford-factory") return "Former Ford Factory";
+      if (site.libraryId === "esplanade") return "Esplanade";
+      if (site.name === "National Library at Victoria Street") return "National Library";
+      if (site.name === "National Library Singapore") return "National Library";
+      return site.name
+        .replace(/^National Library at /, "National: ")
+        .replace(/ Library$/, "")
+        .replace(/^library@/, "library@");
+    }
+
+    function project(lat, lng) {
+      const latMin = 1.23, latMax = 1.46, lngMin = 103.62, lngMax = 104.04;
+      return {
+        x: Math.max(3, Math.min(97, ((lng - lngMin) / (lngMax - lngMin)) * 100)),
+        y: Math.max(5, Math.min(95, ((latMax - lat) / (latMax - latMin)) * 100))
+      };
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "").replace(/[&<>"']/g, ch => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+      }[ch]));
+    }
+  </script>
+</body>
+</html>
