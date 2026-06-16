@@ -145,6 +145,7 @@
       z-index: 430;
       overflow: hidden;
       pointer-events: none;
+      transition: opacity .12s ease;
     }
     .map-label-connectors {
       position: absolute;
@@ -154,6 +155,11 @@
       height: 100%;
       overflow: hidden;
       pointer-events: none;
+      transition: opacity .12s ease;
+    }
+    #map.detail-overlay-open .map-label-layer,
+    #map.detail-overlay-open .map-label-connectors {
+      opacity: 0;
     }
     .label-connector {
       stroke: rgba(24, 33, 47, .62);
@@ -794,6 +800,7 @@
     let connectorLayer = null;
     let currentLabelSites = [];
     let currentLabelEvents = [];
+    let detailOverlayDepth = 0;
 
     slider.max = String(timelineYears.length - 1);
     slider.value = String(currentIndex);
@@ -1227,6 +1234,7 @@
       currentLabelSites = states;
       currentLabelEvents = yearEvents;
       if (map && markerLayer) {
+        setDetailOverlayOpen(false, true);
         markerLayer.clearLayers();
         lineLayer.clearLayers();
         segments.forEach(s => addLineageSegment(s));
@@ -1297,6 +1305,8 @@
         opacity: .97,
         className: "site-tooltip"
       });
+      marker.on("popupopen tooltipopen", () => setDetailOverlayOpen(true));
+      marker.on("popupclose tooltipclose", () => setDetailOverlayOpen(false));
       marker.addTo(markerLayer);
       const el = marker.getElement?.();
       if (el) {
@@ -1304,6 +1314,11 @@
         el.dataset.label = labelText || title || "";
         el.dataset.status = status || "";
       }
+    }
+
+    function setDetailOverlayOpen(isOpen, reset = false) {
+      detailOverlayDepth = reset ? 0 : Math.max(0, detailOverlayDepth + (isOpen ? 1 : -1));
+      if (map) map.getContainer().classList.toggle("detail-overlay-open", detailOverlayDepth > 0);
     }
 
     function renderSmartLabels(states = currentLabelSites, yearEvents = currentLabelEvents) {
