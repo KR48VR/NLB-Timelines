@@ -40,7 +40,32 @@
       gap: 18px;
       margin-bottom: 16px;
     }
-    h1 { margin: 0; font-size: clamp(2rem, 4.2vw, 4.55rem); line-height: .94; letter-spacing: 0; }
+    h1 { margin: 0; font-size: clamp(2rem, 3.9vw, 4.15rem); line-height: .94; letter-spacing: 0; }
+    .title-love {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: 6px;
+      color: #a3122c;
+      font-size: clamp(.64rem, .86vw, .78rem);
+      font-weight: 850;
+      line-height: 1.02;
+      white-space: nowrap;
+      vertical-align: middle;
+      transform: translateY(-.12em);
+    }
+    .title-love .heart {
+      color: #d11f3f;
+      font-size: 1.95em;
+      line-height: 1;
+    }
+    .love-copy {
+      display: inline-flex;
+      flex-direction: column;
+      gap: 1px;
+      line-height: 1.02;
+    }
+    .love-copy span { display: block; white-space: nowrap; }
     .subtitle { margin: 12px 0 0; color: var(--ink-2); max-width: 940px; line-height: 1.52; }
     .badges { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
     .badge {
@@ -109,10 +134,10 @@
     .fallback-label.selected { border-color: rgba(45, 108, 223, .6); }
     .fallback-line {
       stroke: var(--teal);
-      stroke-width: .75;
-      stroke-dasharray: 1.4 1.8;
+      stroke-width: 1.4;
+      stroke-dasharray: 1.7 2;
       stroke-linecap: round;
-      opacity: .82;
+      opacity: .94;
     }
     .map-label-layer {
       position: absolute;
@@ -165,9 +190,11 @@
       border-color: rgba(45, 108, 223, .6);
       box-shadow: 0 0 0 2px rgba(45, 108, 223, .12), 0 8px 18px rgba(24, 33, 47, .16);
     }
+    #map .leaflet-tooltip-pane { z-index: 760 !important; }
+    #map .leaflet-popup-pane { z-index: 780 !important; }
     .map-hud {
       position: absolute;
-      z-index: 500;
+      z-index: 620;
       top: 24px;
       left: 24px;
       right: 24px;
@@ -220,9 +247,9 @@
     .dot.national { background: var(--violet); }
     .dot.archive { background: var(--archive); }
     .line-sample {
-      width: 24px;
+      width: 32px;
       height: 0;
-      border-top: 2px dotted var(--teal);
+      border-top: 3px dotted var(--teal);
       display: inline-block;
     }
     .controls {
@@ -447,6 +474,22 @@
       margin-top: 12px;
     }
     .leaflet-popup-content { color: #1d2532; line-height: 1.35; }
+    .leaflet-tooltip.site-tooltip {
+      max-width: 260px;
+      padding: 8px 10px;
+      border: 1px solid rgba(24, 33, 47, .18);
+      border-radius: 6px;
+      background: rgba(255, 255, 255, .98);
+      color: var(--ink);
+      box-shadow: 0 14px 32px rgba(24, 33, 47, .22);
+      line-height: 1.28;
+      white-space: normal;
+    }
+    .leaflet-tooltip.site-tooltip strong,
+    .leaflet-tooltip.site-tooltip span { display: block; }
+    .leaflet-tooltip.site-tooltip strong { margin-bottom: 3px; font-size: .86rem; }
+    .leaflet-tooltip.site-tooltip span { color: var(--ink-2); font-size: .76rem; }
+    .leaflet-tooltip.site-tooltip .tooltip-note { margin-top: 4px; color: #096b6d; font-weight: 750; }
     .leaflet-control-attribution { font-size: 10px !important; }
     .leaflet-bottom.leaflet-left .leaflet-control-zoom {
       margin-left: 12px;
@@ -471,6 +514,7 @@
       .timeline-bars { grid-template-columns: repeat(2, 1fr); }
       .sources { columns: 1; }
       .search { margin-left: 0; width: 100%; }
+      .title-love { margin-left: 5px; font-size: .68rem; white-space: nowrap; }
     }
   </style>
 </head>
@@ -478,7 +522,7 @@
   <div class="app">
     <header>
       <div>
-        <h1>Singapore libraries, archives <br />and heritage through time</h1>
+        <h1>Singapore libraries, archives <br />and heritage through time <span class="title-love"><span class="heart">♥</span><span class="love-copy"><span>a love letter to</span><span>a national treasure</span></span></span></h1>
         <p class="subtitle">A source-backed timeline of Singapore's public library network and selected NLB archives/heritage sites, showing openings, relocations, reopenings, closures, major renovations, and institutional heritage markers. Dates keep their original precision, so year-only items are not turned into false exact dates.</p>
       </div>
       <div class="badges">
@@ -519,7 +563,7 @@
           <span><i class="dot closure"></i> closed / demolished</span>
           <span><i class="dot national"></i> national-library lineage</span>
           <span><i class="dot archive"></i> archives / heritage</span>
-          <span><i class="line-sample"></i> dotted lineage / shift path</span>
+          <span><i class="line-sample"></i> dotted lines = relocation / national lineage</span>
         </div>
         <div class="controls">
           <div class="control-row">
@@ -907,6 +951,11 @@
         site.visualType = "relocation";
         site.shiftedTo = target;
         site.last = target;
+        const targetSite = sites.get(coordKey(target.libraryId, target.lat, target.lng));
+        if (targetSite) {
+          targetSite.hasFormerSite = true;
+          targetSite.shiftedFrom = site;
+        }
       });
 
       return Array.from(sites.values()).sort((a, b) => {
@@ -1075,9 +1124,16 @@
         .filter(s => s.libraryId !== "mobile-library")
         .sort((a, b) => a.name.localeCompare(b.name) || a.address.localeCompare(b.address));
       list.innerHTML = items.map(s => `<li class="library-card ${s.status}">
-        <div><div class="name">${escapeHtml(s.name)}</div><div class="addr">${escapeHtml(s.address)}<br>${siteDescription(s)}</div></div>
+        <div><div class="name">${escapeHtml(siteListName(s))}</div><div class="addr">${escapeHtml(s.address)}<br>${siteDescription(s)}</div></div>
         <span class="status ${s.status === "closed" ? "inactive" : s.status}">${siteStatusLabel(s)}</span>
       </li>`).join("") || `<li class="library-card"><div><div class="name">No matching libraries</div><div class="addr">Adjust search or filters.</div></div></li>`;
+    }
+
+    function siteListName(site) {
+      if (site.status === "shifted") return `${site.name} (former site)`;
+      if (site.status === "active" && site.hasFormerSite) return `${site.name} (current site)`;
+      if (site.status === "closed" && site.hasFormerSite) return `${site.name} (latest site, currently closed)`;
+      return site.name;
     }
 
     function siteStatusLabel(site) {
@@ -1174,7 +1230,7 @@
         markerLayer.clearLayers();
         lineLayer.clearLayers();
         segments.forEach(s => addLineageSegment(s));
-        states.forEach(s => addLeafletMarker(
+        markerDrawOrder(states).forEach(s => addLeafletMarker(
           s.lat,
           s.lng,
           s.visualType,
@@ -1185,29 +1241,46 @@
           "",
           s.status,
           s.key,
-          mapLabel(s)
+          mapLabel(s),
+          markerTooltip(s)
         ));
-        yearEvents.forEach(e => addLeafletMarker(e.lat, e.lng, e.type, e.libraryName, `${escapeHtml(formatDate(e))}<br>${escapeHtml(e.title)}<br>${escapeHtml(e.address)}`, 13, .28, "", "selected", e.id, mapLabel({ name: e.libraryName, libraryId: e.libraryId })));
+        yearEvents.forEach(e => addLeafletMarker(e.lat, e.lng, e.type, e.libraryName, `${escapeHtml(formatDate(e))}<br>${escapeHtml(e.title)}<br>${escapeHtml(e.address)}`, 13, .28, "", "selected", e.id, mapLabel({ name: e.libraryName, libraryId: e.libraryId }), eventTooltip(e)));
         renderSmartLabels(states, yearEvents);
       }
       renderFallbackMap(states, yearEvents, segments);
     }
 
+    function markerDrawOrder(states) {
+      const rank = { lineage: 0, archive: 1, closed: 2, shifted: 3, active: 4 };
+      return [...states].sort((a, b) => (rank[a.status] ?? 0) - (rank[b.status] ?? 0));
+    }
+
     function addLineageSegment(segment) {
+      const isNationalLineage = segment.libraryId === "national-lineage";
+      const color = isNationalLineage ? typeInfo.national.color : typeInfo.relocation.color;
+      const kind = isNationalLineage ? "national lineage path" : "relocation path";
+      L.polyline([[segment.from.lat, segment.from.lng], [segment.to.lat, segment.to.lng]], {
+        color: "#ffffff",
+        weight: 8,
+        opacity: .9,
+        dashArray: "2 7",
+        lineCap: "round",
+        interactive: false
+      }).addTo(lineLayer);
       const line = L.polyline([[segment.from.lat, segment.from.lng], [segment.to.lat, segment.to.lng]], {
-        color: segment.libraryId === "national-lineage" ? typeInfo.national.color : typeInfo.relocation.color,
-        weight: 3,
-        opacity: .78,
-        dashArray: "2 8",
+        color,
+        weight: 4,
+        opacity: .96,
+        dashArray: "2 7",
         lineCap: "round"
-      }).bindTooltip(`${escapeHtml(segment.name)} lineage: ${escapeHtml(formatDate(segment.event))}`, {
+      }).bindTooltip(`${escapeHtml(segment.name)} ${kind}: ${escapeHtml(formatDate(segment.event))}`, {
         sticky: true,
         direction: "top"
       });
       line.addTo(lineLayer);
     }
 
-    function addLeafletMarker(lat, lng, type, title, html, radius, opacity, label, status, dataKey = "", labelText = "") {
+    function addLeafletMarker(lat, lng, type, title, html, radius, opacity, label, status, dataKey = "", labelText = "", tooltipHtml = "") {
       const color = typeInfo[type]?.color || "#2d6cdf";
       const marker = L.circleMarker([lat, lng], {
         radius,
@@ -1218,6 +1291,12 @@
         opacity: 1,
         className: `map-marker ${status || ""}`
       }).bindPopup(`<strong>${escapeHtml(title)}</strong><br>${html}`);
+      marker.bindTooltip(tooltipHtml || `<strong>${escapeHtml(title)}</strong>`, {
+        sticky: true,
+        direction: "top",
+        opacity: .97,
+        className: "site-tooltip"
+      });
       marker.addTo(markerLayer);
       const el = marker.getElement?.();
       if (el) {
@@ -1596,7 +1675,7 @@
       Array.from(el.querySelectorAll(".fallback-marker, .fallback-label, .fallback-line")).forEach(n => n.remove());
       const svg = el.querySelector("svg");
       segments.forEach(s => addFallbackLine(svg, s));
-      states.forEach(s => addFallbackMarker(el, s.lat, s.lng, s.visualType, markerTitle(s), s.status === "active" ? "active" : ""));
+      markerDrawOrder(states).forEach(s => addFallbackMarker(el, s.lat, s.lng, s.visualType, markerTitle(s), s.status === "active" ? "active" : ""));
       yearEvents.forEach(e => addFallbackMarker(el, e.lat, e.lng, e.type, `${e.libraryName}: ${e.title}`, "selected"));
       renderFallbackLabels(el, states, yearEvents);
     }
@@ -1628,12 +1707,49 @@
 
     function markerTitle(site) {
       if (site.status === "shifted") return `${site.name} (former site)`;
+      if (site.status === "active" && site.hasFormerSite) return `${site.name} (current site)`;
+      if (site.status === "closed" && site.hasFormerSite) return `${site.name} (latest site, currently closed)`;
       if (site.status === "closed") return `${site.name} (closed)`;
       return site.name;
     }
 
     function markerPopup(site) {
       return `${escapeHtml(site.address)}<br><strong>Status:</strong> ${escapeHtml(siteStatusLabel(site))}<br>${siteDescription(site)}`;
+    }
+
+    function markerTooltip(site) {
+      const lines = [
+        `<strong>${escapeHtml(markerTitle(site))}</strong>`,
+        `<span>Status: ${escapeHtml(siteStatusLabel(site))}</span>`,
+        `<span>${escapeHtml(formatDate(site.last))}: ${escapeHtml(site.last.title)}</span>`,
+        `<span>${escapeHtml(shortAddress(site.address))}</span>`
+      ];
+      if (site.status === "shifted" && site.shiftedTo) {
+        lines.push(`<span class="tooltip-note">Shifted to ${escapeHtml(shortAddress(site.shiftedTo.address))} on ${escapeHtml(formatDate(site.shiftedTo))}</span>`);
+      } else if (site.hasFormerSite && site.shiftedFrom) {
+        lines.push(`<span class="tooltip-note">Moved from ${escapeHtml(shortAddress(site.shiftedFrom.address))}</span>`);
+      }
+      return lines.join("");
+    }
+
+    function eventTooltip(event) {
+      const type = typeInfo[event.type] || typeInfo.opening;
+      const lines = [
+        `<strong>${escapeHtml(event.libraryName)}</strong>`,
+        `<span>${escapeHtml(type.label)} - ${escapeHtml(formatDate(event))}</span>`,
+        `<span>${escapeHtml(event.title)}</span>`,
+        `<span>${escapeHtml(shortAddress(event.address))}</span>`
+      ];
+      if (event.movedFrom) {
+        lines.push(`<span class="tooltip-note">Relocation from previous mapped site</span>`);
+      }
+      return lines.join("");
+    }
+
+    function shortAddress(address) {
+      const text = String(address || "").replace(/\s+/g, " ").trim();
+      if (text.length <= 86) return text;
+      return `${text.slice(0, 83).trim()}...`;
     }
 
     function mapLabel(site) {
@@ -1643,10 +1759,14 @@
       if (site.libraryId === "esplanade") return "Esplanade";
       if (site.name === "National Library at Victoria Street") return "National Library";
       if (site.name === "National Library Singapore") return "National Library";
-      return site.name
+      const label = site.name
         .replace(/^National Library at /, "National: ")
         .replace(/ Library$/, "")
         .replace(/^library@/, "library@");
+      if (site.status === "shifted") return `${label} former site`;
+      if (site.status === "active" && site.hasFormerSite) return `${label} current`;
+      if (site.status === "closed" && site.hasFormerSite) return `${label} latest site`;
+      return label;
     }
 
     function project(lat, lng) {
